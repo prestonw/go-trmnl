@@ -108,13 +108,14 @@ func (s *Store) UpdateTelemetry(deviceID int64, t Telemetry) error {
 }
 
 // UpdateDeviceSettings updates the user-editable fields of a device.
-func (s *Store) UpdateDeviceSettings(id int64, name string, refreshRate int, playlistID sql.NullInt64, fontBundle string, showBattery bool) error {
+func (s *Store) UpdateDeviceSettings(id int64, name string, refreshRate int, playlistID sql.NullInt64, fontBundle string, showBattery bool, width, height int) error {
 	if fontBundle == "" {
 		fontBundle = "classic"
 	}
 	_, err := s.db.Exec(`UPDATE devices SET name = ?, refresh_rate = ?, playlist_id = ?, font_bundle = ?,
-		show_battery = ? WHERE id = ?`,
-		name, refreshRate, playlistID, fontBundle, showBattery, id)
+		show_battery = ?, width = COALESCE(?, width), height = COALESCE(?, height) WHERE id = ?`,
+		name, refreshRate, playlistID, fontBundle, showBattery,
+		optInt(width), optInt(height), id)
 	return err
 }
 
@@ -169,4 +170,13 @@ func nz(v, def int) int {
 		return def
 	}
 	return v
+}
+
+// optInt treats 0 as "unspecified" (NULL) so the caller's COALESCE leaves the
+// stored value untouched. Non-zero is stored as-is.
+func optInt(v int) sql.NullInt64 {
+	if v <= 0 {
+		return sql.NullInt64{}
+	}
+	return sql.NullInt64{Int64: int64(v), Valid: true}
 }

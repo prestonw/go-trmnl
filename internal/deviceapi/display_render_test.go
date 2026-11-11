@@ -12,6 +12,7 @@ import (
 
 	"github.com/gesellix/go-trmnl/internal/device"
 	"github.com/gesellix/go-trmnl/internal/deviceapi"
+	"github.com/gesellix/go-trmnl/internal/render"
 	"github.com/gesellix/go-trmnl/internal/server"
 	"github.com/gesellix/go-trmnl/internal/store"
 
@@ -44,7 +45,7 @@ func TestDisplayRendersClockScreen(t *testing.T) {
 	pg, _ := st.CreatePlugin("clock", "Clock")
 	sc, _ := st.CreateScreen(pg.ID, "Clock", `{"use_24h":true,"label":"Office"}`)
 	st.AddPlaylistItem(pl.ID, sc.ID)
-	st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false)
+	st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, 0, 0)
 
 	resp := do(t, ts, http.MethodGet, "/api/display", map[string]string{
 		"ID": testMAC, "Access-Token": d.APIKey,
@@ -92,7 +93,7 @@ func provisionDevice(t *testing.T, ts *httptest.Server, st *store.Store, mac str
 	if err != nil {
 		t.Fatalf("get device: %v", err)
 	}
-	if err := st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: playlistID, Valid: true}, "classic", battery); err != nil {
+	if err := st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: playlistID, Valid: true}, "classic", battery, 0, 0); err != nil {
 		t.Fatalf("settings: %v", err)
 	}
 	d, _ = st.GetDeviceByMAC(mac)
@@ -120,6 +121,54 @@ func displayFilename(t *testing.T, ts *httptest.Server, d *store.Device, volts s
 		t.Fatalf("no screen rendered: filename = %q", body.Filename)
 	}
 	return body.Filename
+}
+
+// bmpSize reads the width/height from a 1-bit BMP3 header (BITMAPINFOHEADER
+// at offset 14: width u32 LE at +4, height u32 LE at +8).
+func bmpSize(t *testing.T, path string) (int, int) {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	w := int(uint32(data[18]) | uint32(data[19])<<8 | uint32(data[20])<<16 | uint32(data[21])<<24)
+	h := int(uint32(data[22]) | uint32(data[23])<<8 | uint32(data[24])<<16 | uint32(data[25])<<24)
+	return w, h
+}
+
+// A device reporting a non-standard panel size must get screens rendered at
+// that size, served from its own per-device cache rather than the shared one.
+func TestDisplayRendersAtDevicePanelSize(t *testing.T) {
+	ts, st, dir := newTestServerDir(t)
+	pl, _ := st.CreatePlaylist("default")
+	pg, _ := st.CreatePlugin("clock", "Clock")
+	sc, _ := st.CreateScreen(pg.ID, "Clock", `{"use_24h":true,"label":"Office"}`)
+	st.AddPlaylistItem(pl.ID, sc.ID)
+
+	// Provision both devices, then give one the non-standard portrait panel.
+	provisionDevice(t, ts, st, "AA:BB:CC:DD:EE:31", pl.ID, false)
+	provisionDevice(t, ts, st, "AA:BB:CC:DD:EE:32", pl.ID, false)
+	portrait, _ := st.GetDeviceByMAC("AA:BB:CC:DD:EE:31")
+	standard, _ := st.GetDeviceByMAC("AA:BB:CC:DD:EE:32")
+	if err := st.UpdateDeviceSettings(portrait.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, 320, 480); err != nil {
+		t.Fatalf("settings: %v", err)
+	}
+
+	standardName := displayFilename(t, ts, standard, "3.95")
+	porName := displayFilename(t, ts, portrait, "3.95")
+
+	standardW, standardH := bmpSize(t, filepath.Join(dir, standardName+".bmp"))
+	if standardW != render.Width || standardH != render.Height {
+		t.Errorf("standard device render = %dx%d, want %dx%d", standardW, standardH, render.Width, render.Height)
+	}
+	// The non-standard render must be a different image at the panel size.
+	if porName == standardName {
+		t.Fatalf("both devices shared the same cached image %q", standardName)
+	}
+	porW, porH := bmpSize(t, filepath.Join(dir, porName+".bmp"))
+	if porW != 320 || porH != 480 {
+		t.Fatalf("non-standard device render = %dx%d, want 320x480", porW, porH)
+	}
 }
 
 // A device with the battery indicator sees a different image than one without,

@@ -255,6 +255,33 @@ func TestAdminHTTPSInfoAndCADownload(t *testing.T) {
 	}
 }
 
+func TestAdminDeviceCreateNormalizesMAC(t *testing.T) {
+	ts, st := newAdminServer(t)
+
+	// A lowercase MAC in the form must be stored normalized, the same way the
+	// device API normalizes the ID header, so the device is reachable via
+	// /api/setup and /api/display.
+	resp, err := ts.Client().PostForm(ts.URL+"/admin/devices", url.Values{"mac": {"aa:bb:cc:dd:ee:ab"}})
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusFound {
+		t.Fatalf("status = %d, want 302", resp.StatusCode)
+	}
+	if loc := resp.Header.Get("Location"); loc == "" {
+		t.Fatal("no redirect location")
+	}
+
+	d, err := st.GetDeviceByMAC("AA:BB:CC:DD:EE:AB")
+	if err != nil {
+		t.Fatalf("device not stored under normalized MAC: %v", err)
+	}
+	if d.MAC != "AA:BB:CC:DD:EE:AB" {
+		t.Errorf("stored MAC = %q, want %q", d.MAC, "AA:BB:CC:DD:EE:AB")
+	}
+}
+
 func TestAdminForceRefreshRendersNextScreen(t *testing.T) {
 	ts, st := newAdminServer(t)
 
@@ -263,7 +290,7 @@ func TestAdminForceRefreshRendersNextScreen(t *testing.T) {
 	pl, _ := st.CreatePlaylist("default")
 	st.AddPlaylistItem(pl.ID, sc.ID)
 	d, _ := st.CreateDevice(&store.Device{MAC: "AA:BB:CC:DD:EE:10", APIKey: "k", FriendlyID: "F10"})
-	if err := st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", true); err != nil {
+	if err := st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", true, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 

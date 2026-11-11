@@ -26,8 +26,16 @@ func (h *Handler) DeviceCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "mac is required", http.StatusBadRequest)
 		return
 	}
+	// Canonicalize the same way the device API does: the ID header is
+	// normalized to upper-case before lookup, so storing the raw form value
+	// would leave lowercase devices unreachable via /api/setup and /api/display.
+	nmac, err := device.NormalizeMAC(mac)
+	if err != nil {
+		http.Error(w, "invalid MAC address: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	// Use the existing Provision logic to generate credentials.
-	d, _, err := device.Provision(h.store, mac, "", "")
+	d, _, err := device.Provision(h.store, nmac, "", "")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -87,7 +95,9 @@ func (h *Handler) DeviceUpdate(w http.ResponseWriter, r *http.Request) {
 	playlistID, _ := parseInt64(r.FormValue("playlist_id"))
 	bundle := r.FormValue("font_bundle")
 	showBattery := r.FormValue("show_battery") != ""
-	if err := h.store.UpdateDeviceSettings(id, name, refresh, nullInt(playlistID), bundle, showBattery); err != nil {
+	width := atoiDefault(r.FormValue("width"), 0)
+	height := atoiDefault(r.FormValue("height"), 0)
+	if err := h.store.UpdateDeviceSettings(id, name, refresh, nullInt(playlistID), bundle, showBattery, width, height); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

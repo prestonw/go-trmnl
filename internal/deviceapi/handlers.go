@@ -42,7 +42,7 @@ func (h *Handler) Setup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	name, _ := h.ensurePlaceholder()
+	name, _ := h.ensurePlaceholder(d)
 	httpx.WriteJSON(w, http.StatusOK, setupResponse{
 		Status:     http.StatusOK,
 		APIKey:     d.APIKey,

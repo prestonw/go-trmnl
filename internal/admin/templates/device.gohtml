@@ -35,6 +35,9 @@
 <form method="post" action="/admin/devices/{{$d.ID}}">
   <label>Name <input type="text" name="name" value="{{ns $d.Name}}"></label>
   <label>Refresh rate (s) <input type="number" name="refresh_rate" min="60" value="{{$d.RefreshRate}}"></label>
+  <label>Panel width <input type="number" name="width" min="0" value="{{$d.Width}}"></label>
+  <label>Panel height <input type="number" name="height" min="0" value="{{$d.Height}}"></label>
+  <p class="muted" style="margin-top: 0; font-size: 0.9em;">Screens render at this size. Leave blank to keep the last reported value; the standard TRMNL panel is 800&times;480.</p>
   <label>Playlist
     <select name="playlist_id">
       <option value="0">(none)</option>
