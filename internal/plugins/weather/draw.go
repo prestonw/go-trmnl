@@ -108,19 +108,16 @@ func drawForecast(dc *gg.Context, fs *plugins.FontSet, d Data, w int) {
 	}
 }
 
-// drawPortrait lays weather out for a portrait panel (height > width), e.g.
-// the 320x480 TRMNL Waveshare. Vertical rhythm (320x480):
+// drawPortrait renders the two-column portrait layout (panel taller than
+// wide): a time+date column on the left, the current weather on the right,
+// and the two-day forecast full-width at the bottom.
 //
-//	header (y 26) / icon (96) / temperature (176) / condition (236) /
-//	feels-like (284) / humidity+wind (314) / sun (344) / divider (372) /
-//	forecast rows (398, 432)
-//
-// Gaps are 13-28px everywhere, and the battery indicator (bottom-right,
-// plate starts at y 453) stays clear. Every text line is fit-to-canvas so
-// nothing clips.
+// Geometry for 320x480 (margin 20): header y 26; columns 20..160 (time) and
+// 160..300 (weather) split by a vertical rule at x 160; forecast divider
+// y 372 with one line per day at y 398/432; the battery indicator (bottom
+// right) is kept clear — nothing draws below y 449.
 func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	fw := float64(w)
-	cx := fw / 2
 	m := 20.0
 	dc.SetRGB(0, 0, 0)
 
@@ -138,30 +135,59 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 		}
 	}
 
-	// Hero: icon, temperature, condition.
-	cat, cond := codeInfo(d.Code)
-	drawIcon(dc, cat, cx, 96, 60)
-	if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, fmt.Sprintf("%.0f°", d.Temp), 56, fw-2*m); ok {
-		dc.SetFontFace(f)
-		dc.DrawStringAnchored(fmt.Sprintf("%.0f°", d.Temp), cx, 176, 0.5, 0.5)
+	// Column geometry. The rule sits at x 160 (midpoint of the 20..300
+	// content span); each column's text keeps clearance on both sides.
+	cxL, wL := 88.0, 128.0 // left column: text region x 24..152
+	cxR, wR := 232.0, 128.0 // right column: text region x 168..296
+
+	// Vertical rule between the columns, spanning the hero region.
+	dc.SetLineWidth(2)
+	dc.DrawLine(160, 64, 160, 352)
+	dc.Stroke()
+
+	// Left column: time, date, sun times, humidity, wind.
+	if d.Time != "" {
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, d.Time, 42, wL); ok {
+			dc.SetFontFace(f)
+			dc.DrawStringAnchored(d.Time, cxL, 112, 0.5, 0.5)
+		}
 	}
-	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, cond, 24, fw-2*m); ok {
-		dc.SetFontFace(f)
-		dc.DrawStringAnchored(cond, cx, 236, 0.5, 0.5)
-	}
-	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), 21, fw-2*m); ok {
-		dc.SetFontFace(f)
-		dc.DrawStringAnchored(fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), cx, 284, 0.5, 0.5)
-	}
-	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Humidity %d%%  Wind %.0f %s", d.Humidity, d.Wind, d.WindUnit), 20, fw-2*m); ok {
-		dc.SetFontFace(f)
-		dc.DrawStringAnchored(fmt.Sprintf("Humidity %d%%  Wind %.0f %s", d.Humidity, d.Wind, d.WindUnit), cx, 314, 0.5, 0.5)
+	if d.Date != "" {
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, d.Date, 19, wL); ok {
+			dc.SetFontFace(f)
+			dc.DrawStringAnchored(d.Date, cxL, 156, 0.5, 0.5)
+		}
 	}
 	if d.Sunrise != "" || d.Sunset != "" {
-		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Sun %s - %s", d.Sunrise, d.Sunset), 20, fw-2*m); ok {
+		sun := fmt.Sprintf("%s - %s", d.Sunrise, d.Sunset)
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, sun, 17, wL); ok {
 			dc.SetFontFace(f)
-			dc.DrawStringAnchored(fmt.Sprintf("Sun %s - %s", d.Sunrise, d.Sunset), cx, 344, 0.5, 0.5)
+			dc.DrawStringAnchored(sun, cxL, 196, 0.5, 0.5)
 		}
+	}
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Humidity %d%%", d.Humidity), 17, wL); ok {
+		dc.SetFontFace(f)
+		dc.DrawStringAnchored(fmt.Sprintf("Humidity %d%%", d.Humidity), cxL, 252, 0.5, 0.5)
+	}
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Wind %.0f %s", d.Wind, d.WindUnit), 17, wL); ok {
+		dc.SetFontFace(f)
+		dc.DrawStringAnchored(fmt.Sprintf("Wind %.0f %s", d.Wind, d.WindUnit), cxL, 282, 0.5, 0.5)
+	}
+
+	// Right column: icon, temperature, condition, feels-like.
+	cat, cond := codeInfo(d.Code)
+	drawIcon(dc, cat, cxR, 104, 46)
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, fmt.Sprintf("%.0f°", d.Temp), 44, wR); ok {
+		dc.SetFontFace(f)
+		dc.DrawStringAnchored(fmt.Sprintf("%.0f°", d.Temp), cxR, 172, 0.5, 0.5)
+	}
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, cond, 19, wR); ok {
+		dc.SetFontFace(f)
+		dc.DrawStringAnchored(cond, cxR, 218, 0.5, 0.5)
+	}
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), 17, wR); ok {
+		dc.SetFontFace(f)
+		dc.DrawStringAnchored(fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), cxR, 258, 0.5, 0.5)
 	}
 
 	// Forecast: one line per day — heading+condition left, L/H+precip right.

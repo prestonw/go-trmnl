@@ -43,7 +43,10 @@ func (p *Plugin) Type() string { return "weather" }
 func (p *Plugin) Title() string { return "Weather" }
 
 // DefaultRefresh returns the cache TTL hint for rendered weather screens.
-func (p *Plugin) DefaultRefresh() time.Duration { return 30 * time.Minute }
+// One minute: the portrait layout embeds a ticking clock, so a longer TTL
+// would freeze the time on screen. The fetched weather data itself stays
+// fresh for 30 minutes via the in-process API cache in fetchForecast.
+func (p *Plugin) DefaultRefresh() time.Duration { return time.Minute }
 
 // settings configures the weather screen. units is kept for backward
 // compatibility; the finer-grained *_unit fields override it when set.
@@ -57,6 +60,17 @@ type settings struct {
 	PrecipUnit      string  `json:"precip_unit"`      // "mm" or "inch"
 	ForecastHeading string  `json:"forecast_heading"` // "relative" (Today/Tomorrow) or "date"
 	Label           string  `json:"label"`            // shown in the corner
+	Timezone        string  `json:"timezone"`         // IANA name for the clock column; empty == server local
+	Use24h          *bool   `json:"use_24h"`          // clock column format; unset == true (device clock is 24h)
+}
+
+// clock24h reports the default clock-column format: 24-hour, to match the
+// device's main clock screen.
+func (s settings) clock24h() bool {
+	if s.Use24h != nil {
+		return *s.Use24h
+	}
+	return true
 }
 
 func (s settings) imperial() bool { return s.Units == "imperial" }
@@ -111,6 +125,9 @@ type Data struct {
 	TempUnit string // "C" or "F"
 	WindUnit string // "km/h", "mph", ...
 	Label    string
+
+	Time string // clock column, e.g. "13:37" or "1:37 PM"
+	Date string // clock column, compact, e.g. "Wed, Nov 11"
 
 	Temp      float64
 	FeelsLike float64
@@ -196,6 +213,21 @@ func (p *Plugin) DataModel(ctx context.Context, in plugins.RenderInput) (any, er
 			PrecipPct: atI(fc.Daily.PrecipProb, i),
 		})
 	}
+
+	// Clock column: same rules as the clock plugin (timezone + 24h), with a
+	// compact date — the full "Wednesday, November 11" cannot fit a half panel.
+	now := in.Now
+	if s.Timezone != "" {
+		if loc, err := time.LoadLocation(s.Timezone); err == nil {
+			now = now.In(loc)
+		}
+	}
+	timeFmt := "15:04"
+	if !s.clock24h() {
+		timeFmt = "3:04 PM"
+	}
+	d.Time = now.Format(timeFmt)
+	d.Date = now.Format("Mon, Jan 2")
 	return d, nil
 }
 
@@ -245,6 +277,25 @@ type forecastResp struct {
 	} `json:"daily"`
 }
 
+// apiCacheTTL is how long a fetched API response stays usable. Weather data
+// rarely changes within half an hour, and the portrait layout re-renders once
+// a minute for its clock column — without the cache that would mean a free
+// Open-Meteo API call per screen per minute.
+const apiCacheTTL = 30 * time.Minute
+
+// apiCacheEntry is one cached API response.
+type apiCacheEntry struct {
+	at    time.Time
+	value any
+}
+
+// In-process caches of Open-Meteo responses, keyed by request URL (which
+// already encodes location and units). A handful of entries at most.
+var (
+	forecastCache = map[string]apiCacheEntry{}
+	geocodeCache  = map[string]apiCacheEntry{}
+)
+
 func (p *Plugin) fetchForecast(ctx context.Context, lat, lon float64, tempUnit, windUnit, precipUnit string) (*forecastResp, error) {
 	q := url.Values{}
 	q.Set("latitude", strconv.FormatFloat(lat, 'f', 4, 64))
@@ -256,11 +307,17 @@ func (p *Plugin) fetchForecast(ctx context.Context, lat, lon float64, tempUnit, 
 	q.Set("temperature_unit", tempUnit)
 	q.Set("wind_speed_unit", windUnit)
 	q.Set("precipitation_unit", precipUnit)
+	u := p.forecastBase + "?" + q.Encode()
 
+	if e, ok := forecastCache[u]; ok && time.Since(e.at) < apiCacheTTL {
+		fc := e.value.(forecastResp)
+		return &fc, nil
+	}
 	var out forecastResp
-	if err := p.getJSON(ctx, p.forecastBase+"?"+q.Encode(), &out); err != nil {
+	if err := p.getJSON(ctx, u, &out); err != nil {
 		return nil, fmt.Errorf("weather: forecast: %w", err)
 	}
+	forecastCache[u] = apiCacheEntry{at: time.Now(), value: out}
 	return &out, nil
 }
 
@@ -277,10 +334,16 @@ func (p *Plugin) geocode(ctx context.Context, name string) (lat, lon float64, pl
 	q := url.Values{}
 	q.Set("name", name)
 	q.Set("count", "1")
+	u := p.geocodeBase + "?" + q.Encode()
 
 	var out geocodeResp
-	if err := p.getJSON(ctx, p.geocodeBase+"?"+q.Encode(), &out); err != nil {
-		return 0, 0, "", fmt.Errorf("weather: geocode: %w", err)
+	if e, ok := geocodeCache[u]; ok && time.Since(e.at) < apiCacheTTL {
+		out = e.value.(geocodeResp)
+	} else {
+		if err := p.getJSON(ctx, u, &out); err != nil {
+			return 0, 0, "", fmt.Errorf("weather: geocode: %w", err)
+		}
+		geocodeCache[u] = apiCacheEntry{at: time.Now(), value: out}
 	}
 	if len(out.Results) == 0 {
 		return 0, 0, "", fmt.Errorf("weather: location %q not found", name)

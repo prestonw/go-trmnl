@@ -162,11 +162,13 @@ func TestRenderProducesPanel(t *testing.T) {
 
 // TestRenderPortraitFitsPanel: on a portrait panel (320x480) no text may be
 // clipped at the edges — every line is fit-to-canvas — and the battery zone
-// at the bottom right stays clear of text.
+// at the bottom right stays clear of text. The two hero columns (time left,
+// weather right) must also stay within their own halves.
 func TestRenderPortraitFitsPanel(t *testing.T) {
 	p := New()
 	d := Data{Place: "Dublin", TempUnit: "C", WindUnit: "km/h", Temp: 12, FeelsLike: 9, Code: 61,
 		CondLabel: "Rain", Humidity: 88, Wind: 22, Sunrise: "07:24", Sunset: "16:31",
+		Time: "13:37", Date: "Wed, Nov 11",
 		Days: []DayForecast{
 			{Heading: "Today", Code: 61, Hi: 14, Lo: 9, UV: 1, PrecipPct: 90},
 			{Heading: "Tomorrow", Code: 3, Hi: 13, Lo: 8, UV: 1, PrecipPct: 70},
@@ -180,6 +182,10 @@ func TestRenderPortraitFitsPanel(t *testing.T) {
 	draw.Draw(g, img.Bounds(), img, image.Point{}, draw.Src)
 	px := g.Pix
 
+	// Hero band (y 64..352): the vertical column rule sits at x 160. No
+	// column's text may touch it — the seam zone x 156..164 may contain ink
+	// only where the rule itself is drawn (2px centered on x 160).
+	seam := 0
 	edge, low := 0, 0
 	for y := 0; y < h; y++ {
 		for x := 0; x < w; x++ {
@@ -194,6 +200,9 @@ func TestRenderPortraitFitsPanel(t *testing.T) {
 			if y >= h-31 {
 				low++
 			}
+			if y >= 64 && y <= 352 && x >= 156 && x <= 164 && !(x >= 158 && x <= 162) {
+				seam++
+			}
 		}
 	}
 	if edge > 0 {
@@ -201,5 +210,8 @@ func TestRenderPortraitFitsPanel(t *testing.T) {
 	}
 	if low > 0 {
 		t.Errorf("%d ink pixels below y=%d (battery indicator would overlap)", low, h-31)
+	}
+	if seam > 0 {
+		t.Errorf("%d ink pixels in the column seam (text touching the divider rule)", seam)
 	}
 }
