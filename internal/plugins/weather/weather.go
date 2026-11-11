@@ -322,6 +322,11 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	dc.Clear()
 	dc.SetRGB(0, 0, 0)
 
+	if in.Height > in.Width {
+		drawPortrait(dc, in.Fonts, d, in.Width, in.Height)
+		return img, nil
+	}
+
 	drawCurrent(dc, in.Fonts, d, in.Width)
 	drawForecast(dc, in.Fonts, d, in.Width)
 	drawLabel(dc, in.Fonts, d, in.Width, in.Height)

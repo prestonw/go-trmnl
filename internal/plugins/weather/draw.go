@@ -108,6 +108,83 @@ func drawForecast(dc *gg.Context, fs *plugins.FontSet, d Data, w int) {
 	}
 }
 
+// drawPortrait lays weather out for a portrait panel (height > width), e.g.
+// the 320x480 TRMNL Waveshare. Vertical rhythm (320x480):
+//
+//	header (y 26) / icon (96) / temperature (176) / condition (236) /
+//	feels-like (284) / humidity+wind (314) / sun (344) / divider (372) /
+//	forecast rows (398, 432)
+//
+// Gaps are 13-28px everywhere, and the battery indicator (bottom-right,
+// plate starts at y 453) stays clear. Every text line is fit-to-canvas so
+// nothing clips.
+func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
+	fw := float64(w)
+	cx := fw / 2
+	m := 20.0
+	dc.SetRGB(0, 0, 0)
+
+	// Header: label left, place right.
+	if text := d.Label; text != "" {
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, text, 22, fw/2-2*m); ok {
+			dc.SetFontFace(f)
+			dc.DrawStringAnchored(text, m, 26, 0, 0.5)
+		}
+	}
+	if d.Place != "" {
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, d.Place, 22, fw/2-2*m); ok {
+			dc.SetFontFace(f)
+			dc.DrawStringAnchored(d.Place, fw-m, 26, 1, 0.5)
+		}
+	}
+
+	// Hero: icon, temperature, condition.
+	cat, cond := codeInfo(d.Code)
+	drawIcon(dc, cat, cx, 96, 60)
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, fmt.Sprintf("%.0f°", d.Temp), 56, fw-2*m); ok {
+		dc.SetFontFace(f)
+		dc.DrawStringAnchored(fmt.Sprintf("%.0f°", d.Temp), cx, 176, 0.5, 0.5)
+	}
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, cond, 24, fw-2*m); ok {
+		dc.SetFontFace(f)
+		dc.DrawStringAnchored(cond, cx, 236, 0.5, 0.5)
+	}
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), 21, fw-2*m); ok {
+		dc.SetFontFace(f)
+		dc.DrawStringAnchored(fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), cx, 284, 0.5, 0.5)
+	}
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Humidity %d%%  Wind %.0f %s", d.Humidity, d.Wind, d.WindUnit), 20, fw-2*m); ok {
+		dc.SetFontFace(f)
+		dc.DrawStringAnchored(fmt.Sprintf("Humidity %d%%  Wind %.0f %s", d.Humidity, d.Wind, d.WindUnit), cx, 314, 0.5, 0.5)
+	}
+	if d.Sunrise != "" || d.Sunset != "" {
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Sun %s - %s", d.Sunrise, d.Sunset), 20, fw-2*m); ok {
+			dc.SetFontFace(f)
+			dc.DrawStringAnchored(fmt.Sprintf("Sun %s - %s", d.Sunrise, d.Sunset), cx, 344, 0.5, 0.5)
+		}
+	}
+
+	// Forecast: one line per day — heading+condition left, L/H+precip right.
+	// UV is dropped on portrait: two lines per row would crowd the battery.
+	dc.SetLineWidth(2)
+	dc.DrawLine(m, 372, fw-m, 372)
+	dc.Stroke()
+	y := 398.0
+	for _, day := range d.Days {
+		c, cl := codeInfo(day.Code)
+		drawIcon(dc, c, 36, y, 18)
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, day.Heading+" · "+cl, 19, fw/2-46); ok {
+			dc.SetFontFace(f)
+			dc.DrawStringAnchored(day.Heading+" · "+cl, 62, y, 0, 0.5)
+		}
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("L %.0f° H %.0f° · %d%%", day.Lo, day.Hi, day.PrecipPct), 19, fw/2-46); ok {
+			dc.SetFontFace(f)
+			dc.DrawStringAnchored(fmt.Sprintf("L %.0f° H %.0f° · %d%%", day.Lo, day.Hi, day.PrecipPct), fw-m, y, 1, 0.5)
+		}
+		y += 34
+	}
+}
+
 // drawLabel draws the footer: a left label and the place (with no time, which
 // the device does not provide here) on the right.
 func drawLabel(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {

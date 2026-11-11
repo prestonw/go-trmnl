@@ -67,3 +67,41 @@ func TestRenderDimensions(t *testing.T) {
 		t.Errorf("bounds = %v", b)
 	}
 }
+
+// TestRenderFitsNarrowCanvas is the regression test for the 320x480 DIY
+// panel: the time must shrink to fit, with no ink within 8px of either edge.
+func TestRenderFitsNarrowCanvas(t *testing.T) {
+	p := &Plugin{}
+	in := plugins.RenderInput{
+		Width: 320, Height: 480, Now: time.Date(2026, 11, 11, 14, 8, 0, 0, time.UTC),
+		Settings: []byte(`{"use_24h":true,"label":"Kitchen"}`),
+		Fonts:    plugins.NewFontSet("", "classic", "", "", ""),
+	}
+	d, _ := p.DataModel(context.Background(), in)
+	img, err := p.Render(context.Background(), in, d)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := img.Bounds()
+	minX, maxX := b.Max.X, b.Min.X
+	for y := b.Min.Y; y < b.Max.Y; y++ {
+		for x := b.Min.X; x < b.Max.X; x++ {
+			r, g, bl, _ := img.At(x, y).RGBA()
+			if r|g|bl == 0 { // black pixel
+				if x < minX {
+					minX = x
+				}
+				if x > maxX {
+					maxX = x
+				}
+			}
+		}
+	}
+	if maxX-minX < 40 {
+		t.Fatalf("no time rendered (ink span %dpx)", maxX-minX)
+	}
+	const margin = 8
+	if minX < margin || maxX > b.Max.X-margin {
+		t.Errorf("ink spans x=[%d,%d], want inside [%d,%d] (text overflows the panel)", minX, maxX, margin, b.Max.X-margin)
+	}
+}

@@ -72,18 +72,21 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	dc.SetRGB(0, 0, 0)
 
 	cx, cy := float64(in.Width)/2, float64(in.Height)/2
+	// Text must fit the panel: the sizes below are 800x480 design values;
+	// FitFace scales a face down when its text would overflow the canvas.
+	fitW := float64(in.Width) - 16 // 8px margin each side
 
 	if d.Label != "" {
-		if f, err := in.Fonts.Face(36, plugins.StyleSans); err == nil {
+		if f, ok := plugins.FitFace(dc, in.Fonts, plugins.StyleSans, d.Label, 36, fitW); ok {
 			dc.SetFontFace(f)
 			dc.DrawStringAnchored(d.Label, cx, cy-150, 0.5, 0.5)
 		}
 	}
-	if f, err := in.Fonts.Face(140, plugins.StyleTitle); err == nil {
+	if f, ok := plugins.FitFace(dc, in.Fonts, plugins.StyleTitle, d.Time, 140, fitW); ok {
 		dc.SetFontFace(f)
 		dc.DrawStringAnchored(d.Time, cx, cy, 0.5, 0.5)
 	}
-	if f, err := in.Fonts.Face(44, plugins.StyleSans); err == nil {
+	if f, ok := plugins.FitFace(dc, in.Fonts, plugins.StyleSans, d.Date, 44, fitW); ok {
 		dc.SetFontFace(f)
 		dc.DrawStringAnchored(d.Date, cx, cy+120, 0.5, 0.5)
 	}
