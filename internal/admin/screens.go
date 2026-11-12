@@ -92,6 +92,10 @@ func (h *Handler) ScreenDetail(w http.ResponseWriter, r *http.Request) {
 	if sc.DitherMode.Valid {
 		dither = sc.DitherMode.String
 	}
+	refreshSecs := 0
+	if sc.RefreshSeconds.Valid {
+		refreshSecs = int(sc.RefreshSeconds.Int64)
+	}
 	devices, _ := h.store.ListDevices()
 	data := map[string]any{
 		"Nav":              "screens",
@@ -101,6 +105,7 @@ func (h *Handler) ScreenDetail(w http.ResponseWriter, r *http.Request) {
 		"IsFamilyCalendar": pluginType == "familycalendar",
 		"DitherMode":       dither,
 		"GlobalDither":     globalDither,
+		"RefreshSeconds":   refreshSecs,
 		"BaseURL":          h.baseURL,
 		"Devices":          devices,
 		// A preview rendered for a specific device is not the screen's shared
@@ -199,6 +204,10 @@ func (h *Handler) ScreenUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.store.UpdateScreenDither(id, parseDitherOverride(r.FormValue("dither_mode"))); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := h.store.UpdateScreenRefresh(id, parseRefreshSeconds(r.FormValue("refresh_seconds"))); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -303,6 +312,16 @@ func parseDitherOverride(v string) sql.NullString {
 		return sql.NullString{String: v, Valid: true}
 	}
 	return sql.NullString{}
+}
+
+// parseRefreshSeconds maps the screen-editor cadence form value to a per-screen
+// refresh cadence. Empty (or non-numeric) means "use the plugin's default
+// rate" and is stored as NULL.
+func parseRefreshSeconds(v string) sql.NullInt64 {
+	if n, err := strconv.Atoi(v); err == nil && n > 0 {
+		return sql.NullInt64{Int64: int64(n), Valid: true}
+	}
+	return sql.NullInt64{}
 }
 
 // familyCalendarSettings builds the familycalendar settings JSON from the

@@ -101,7 +101,7 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 		Status:             0,
 		ImageURL:           h.imageURL(img.urlName),
 		Filename:           img.stem,
-		RefreshRate:        d.RefreshRate,
+		RefreshRate:        pollInterval(d, img.screen),
 		UpdateFirmware:     d.FirmwareUpdate && d.FirmwareURL.Valid,
 		FirmwareURL:        firmwareURL,
 		ResetFirmware:      d.ResetFirmware,

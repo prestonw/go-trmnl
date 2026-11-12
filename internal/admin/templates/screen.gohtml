@@ -15,6 +15,16 @@
           <option value="threshold" {{if eq .DitherMode "threshold"}}selected{{end}}>Threshold (sharp, for text/UI)</option>
         </select>
       </label>
+      <label>Refresh cadence
+        <select name="refresh_seconds">
+          <option value="" {{if eq .RefreshSeconds 0}}selected{{end}}>Default (plugin rate)</option>
+          <option value="5" {{if eq .RefreshSeconds 5}}selected{{end}}>Live — every 5 seconds</option>
+          <option value="10" {{if eq .RefreshSeconds 10}}selected{{end}}>Live — every 10 seconds</option>
+          <option value="15" {{if eq .RefreshSeconds 15}}selected{{end}}>Live — every 15 seconds</option>
+          <option value="30" {{if eq .RefreshSeconds 30}}selected{{end}}>Live — every 30 seconds</option>
+        </select>
+      </label>
+      <p class="muted" style="margin-top: 0; font-size: 0.9em;">Live screens are dashboards: while one is showing, the device holds on it and re-renders at this cadence instead of cycling the playlist — good for clock/weather on always-powered panels. Leave at Default for normal rotation.</p>
       {{if .IsFamilyCalendar}}
       <p>Calendar accounts to show <span class="muted">(none selected = all)</span></p>
       {{range .FCAccounts}}

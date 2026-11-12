@@ -89,8 +89,8 @@ func (h *Handler) DeviceUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	name := r.FormValue("name")
 	refresh := atoiDefault(r.FormValue("refresh_rate"), 900)
-	if refresh < 60 {
-		refresh = 60
+	if refresh < 5 {
+		refresh = 5
 	}
 	playlistID, _ := parseInt64(r.FormValue("playlist_id"))
 	bundle := r.FormValue("font_bundle")

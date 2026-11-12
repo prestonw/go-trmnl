@@ -54,10 +54,12 @@ func New(st *store.Store, baseURL, uploadsDir string, disableAuth bool) *Handler
 	}
 }
 
-// screenImage holds the served image's URL filename and its bare stem.
+// screenImage holds the served image's URL filename, its bare stem, and the
+// screen that produced it (so the caller can derive the poll interval).
 type screenImage struct {
 	urlName string // e.g. "<hash>.bmp" or "placeholder.bmp"
 	stem    string // e.g. "<hash>" or "placeholder"
+	screen  *store.Screen
 }
 
 // currentImage selects the device's next screen, renders it if needed, and
@@ -74,11 +76,13 @@ func (h *Handler) currentImage(ctx context.Context, d *store.Device) screenImage
 		name, _ := h.ensurePlaceholder(d)
 		return screenImage{urlName: name, stem: trimExt(name)}
 	}
-	return screenImage{urlName: hash + ".bmp", stem: hash}
+	return screenImage{urlName: hash + ".bmp", stem: hash, screen: screen}
 }
 
 // renderScreen returns the content hash of the screen's current image,
-// rendering (and caching) it when the cache is stale or missing.
+// rendering (and caching) it when the cache is stale or missing. A screen with
+// a live cadence re-renders at that cadence; otherwise the plugin's default
+// refresh interval applies.
 func (h *Handler) renderScreen(ctx context.Context, d *store.Device, screen *store.Screen) (string, error) {
 	pluginRow, err := h.store.GetPlugin(screen.PluginID)
 	if err != nil {
@@ -87,6 +91,9 @@ func (h *Handler) renderScreen(ctx context.Context, d *store.Device, screen *sto
 	ttl := time.Duration(0)
 	if p, ok := plugins.Get(pluginRow.Type); ok {
 		ttl = p.DefaultRefresh()
+	}
+	if screen.RefreshSeconds.Valid && screen.RefreshSeconds.Int64 > 0 {
+		ttl = time.Duration(screen.RefreshSeconds.Int64) * time.Second
 	}
 	if hash, ok := h.cachedHash(d, screen, ttl); ok {
 		return hash, nil
@@ -157,6 +164,24 @@ func (h *Handler) ditherModeFor(sc *store.Screen) render.Mode {
 		return render.ParseMode(sc.DitherMode.String)
 	}
 	return h.ditherMode()
+}
+
+// pollInterval returns how fast the device should re-poll for this screen, in
+// seconds. A screen with a live cadence (refresh_seconds set) wins: it is
+// re-rendered and re-fetched at that cadence. Otherwise the device's base
+// refresh rate applies. Values under 5s are clamped: the framebuffer client
+// floors its poll interval at 15s, so faster would just waste requests.
+func pollInterval(d *store.Device, screen *store.Screen) int {
+	if screen != nil && screen.RefreshSeconds.Valid && screen.RefreshSeconds.Int64 > 0 {
+		if s := int(screen.RefreshSeconds.Int64); s >= 5 {
+			return s
+		}
+		return 5
+	}
+	if d != nil && d.RefreshRate >= 5 {
+		return d.RefreshRate
+	}
+	return 60
 }
 
 func trimExt(name string) string {

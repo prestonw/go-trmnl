@@ -69,9 +69,15 @@ type Screen struct {
 	Name         string
 	SettingsJSON string
 	DitherMode   sql.NullString // NULL == inherit the global dither_mode setting
-	RenderedHash sql.NullString
-	RenderedAt   sql.NullInt64
-	CreatedAt    int64
+	// RefreshSeconds is an optional per-screen refresh cadence in seconds.
+	// NULL means "use the plugin's default refresh interval" (normal rotating
+	// screen). A non-NULL value makes the screen live: the server re-renders
+	// it at that cadence and the device holds on it (the playlist does not
+	// advance) while re-polling at that interval.
+	RefreshSeconds sql.NullInt64
+	RenderedHash   sql.NullString
+	RenderedAt     sql.NullInt64
+	CreatedAt      int64
 }
 
 // Playlist is an ordered collection of screens.

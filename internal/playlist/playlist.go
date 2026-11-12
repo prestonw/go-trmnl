@@ -14,15 +14,31 @@ var ErrNoScreen = errors.New("no screen available")
 
 // NextScreen returns the next visible screen for the device and advances the
 // device's playlist cursor. It returns ErrNoScreen when nothing is assigned.
+//
+// A screen with a live refresh cadence (RefreshSeconds set) is a dashboard
+// the panel holds on while it ticks: the cursor is not advanced, so the
+// playlist does not cycle away from it. Clearing the cadence (or removing the
+// screen from the playlist) resumes normal round-robin.
 func NextScreen(st *store.Store, d *store.Device) (*store.Screen, error) {
 	screenID, idx, n, err := pick(st, d)
 	if err != nil {
 		return nil, err
 	}
-	// Advance the cursor for the next poll; best-effort persistence.
-	_ = st.SetPlaylistCursor(d.ID, (idx+1)%n)
+	screen, err := st.GetScreen(screenID)
+	if err != nil {
+		return nil, err
+	}
+	if !isLive(screen) {
+		// Advance the cursor for the next poll; best-effort persistence.
+		_ = st.SetPlaylistCursor(d.ID, (idx+1)%n)
+	}
+	return screen, nil
+}
 
-	return st.GetScreen(screenID)
+// isLive reports whether a screen carries a live refresh cadence and therefore
+// holds the panel in place while it is displayed.
+func isLive(s *store.Screen) bool {
+	return s != nil && s.RefreshSeconds.Valid && s.RefreshSeconds.Int64 > 0
 }
 
 // PeekScreen returns the screen the device's next poll will show, without
