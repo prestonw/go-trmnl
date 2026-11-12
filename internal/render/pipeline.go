@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 )
@@ -50,8 +51,9 @@ func (r *Renderer) Process(src image.Image, mode Mode) (Result, error) {
 	return res, nil
 }
 
-// ProcessColor encodes src as a 24-bit color BMP without monochrome dithering.
-// The hash is derived from the raw RGBA pixel bytes so caching works the same.
+// ProcessColor encodes src as a 24-bit color BMP (no monochrome dithering)
+// plus a lossless color PNG for the admin preview. The hash is derived from
+// the encoded BMP bytes so caching and cache-busting work as in Process.
 func (r *Renderer) ProcessColor(src image.Image) (Result, error) {
 	var buf bytes.Buffer
 	if err := EncodeColorBMP(&buf, src); err != nil {
@@ -62,12 +64,17 @@ func (r *Renderer) ProcessColor(src image.Image) (Result, error) {
 	hash := hex.EncodeToString(sum[:16])
 	res := Result{Hash: hash, BMPName: hash + ".bmp", PNGName: hash + ".png"}
 
-	if err := r.writeIfAbsent(res.BMPName, func(buf *bytes.Buffer) error {
-		return EncodeColorBMP(buf, src)
+	if err := r.writeIfAbsent(res.BMPName, func(b *bytes.Buffer) error {
+		_, err := b.Write(buf.Bytes())
+		return err
 	}); err != nil {
 		return Result{}, err
 	}
-	// No PNG1 needed for color — keep the Result struct consistent.
+	if err := r.writeIfAbsent(res.PNGName, func(b *bytes.Buffer) error {
+		return png.Encode(b, src)
+	}); err != nil {
+		return Result{}, err
+	}
 	return res, nil
 }
 
