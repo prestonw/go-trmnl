@@ -227,6 +227,7 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, _ int) {
 	for _, day := range d.Days {
 		c, _, col := codeInfo(day.Code)
 		drawIcon(dc, c, 36, y, 18, col)
+		dc.SetRGB(0, 0, 0) // reset to black after colored icon
 		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, day.Heading+" · "+conditionFor(c), 22, fw/2-46); ok {
 			dc.SetFontFace(f)
 			dc.DrawStringAnchored(day.Heading+" · "+conditionFor(c), 62, y, 0, 0.5)
