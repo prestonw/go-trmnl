@@ -137,7 +137,7 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, _ int) {
 
 	// Column geometry. The rule sits at x 160 (midpoint of the 20..300
 	// content span); each column's text keeps clearance on both sides.
-	cxL, wL := 88.0, 128.0 // left column: text region x 24..152
+	cxL, wL := 88.0, 128.0  // left column: text region x 24..152
 	cxR, wR := 232.0, 128.0 // right column: text region x 168..296
 
 	// Vertical rule between the columns, spanning the hero region.
