@@ -200,7 +200,7 @@ func TestRenderPortraitFitsPanel(t *testing.T) {
 			if y >= h-31 {
 				low++
 			}
-			if y >= 64 && y <= 352 && x >= 156 && x <= 164 && !(x >= 158 && x <= 162) {
+			if y >= 64 && y <= 352 && x >= 156 && x <= 164 && (x < 158 || x > 162) {
 				seam++
 			}
 		}

@@ -312,9 +312,10 @@ func (p *Plugin) fetchForecast(ctx context.Context, lat, lon float64, tempUnit, 
 	if e, ok := forecastCache[u]; ok && time.Since(e.at) < apiCacheTTL {
 		fc, ok := e.value.(forecastResp)
 		if !ok {
-			continue
+			delete(forecastCache, u)
+		} else {
+			return &fc, nil
 		}
-		return &fc, nil
 	}
 	var out forecastResp
 	if err := p.getJSON(ctx, u, &out); err != nil {
@@ -341,7 +342,11 @@ func (p *Plugin) geocode(ctx context.Context, name string) (lat, lon float64, pl
 
 	var out geocodeResp
 	if e, ok := geocodeCache[u]; ok && time.Since(e.at) < apiCacheTTL {
-		out = e.value.(geocodeResp)
+		out, ok = e.value.(geocodeResp)
+		if !ok {
+			delete(geocodeCache, u)
+			out = geocodeResp{}
+		}
 	} else {
 		if err := p.getJSON(ctx, u, &out); err != nil {
 			return 0, 0, "", fmt.Errorf("weather: geocode: %w", err)

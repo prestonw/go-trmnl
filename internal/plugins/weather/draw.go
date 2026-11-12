@@ -116,7 +116,7 @@ func drawForecast(dc *gg.Context, fs *plugins.FontSet, d Data, w int) {
 // 160..300 (weather) split by a vertical rule at x 160; forecast divider
 // y 372 with one line per day at y 398/432; the battery indicator (bottom
 // right) is kept clear — nothing draws below y 449.
-func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
+func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, _ int) {
 	fw := float64(w)
 	m := 20.0
 	dc.SetRGB(0, 0, 0)
