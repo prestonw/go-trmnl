@@ -388,9 +388,25 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	}
 	d.FooterReserveRight = in.FooterReserveRight
 	img := image.NewRGBA(image.Rect(0, 0, in.Width, in.Height))
+
+	// Direct pixel fill — go-gg Fill() doesn't reliably fill large canvases.
+	tintR, tintG, tintB := uint8(240), uint8(250), uint8(240) // pale green default
+	cat, _, _ := codeInfo(d.Code)
+	if cat == catStorm {
+		tintR, tintG, tintB = uint8(250), uint8(235), uint8(235) // pale red
+	}
+	for y := 0; y < in.Height; y++ {
+		row := y * in.Width * 4
+		for x := 0; x < in.Width; x++ {
+			i := row + x*4
+			img.Pix[i+0] = tintR
+			img.Pix[i+1] = tintG
+			img.Pix[i+2] = tintB
+			img.Pix[i+3] = 255
+		}
+	}
+
 	dc := gg.NewContextForRGBA(img)
-	dc.SetRGB(1, 1, 1)
-	dc.Clear()
 	dc.SetRGB(0, 0, 0)
 
 	if in.Height > in.Width {

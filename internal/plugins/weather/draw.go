@@ -166,20 +166,11 @@ func drawForecast(dc *gg.Context, fs *plugins.FontSet, d Data, w int) {
 // top half = large time + date in a centered box,
 // bottom half = weather data in colored-card boxes.
 // Box outlines are colored by weather condition (gold=sun, blue=rain, red=storm alert).
-// Full-panel background tint: pale green for OK, pale red for alerts.
+// Background tint is set by Render().
 func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	fw := float64(w)
 	cat, _, _ := codeInfo(d.Code)
 	col := boxOutline(cat)
-
-	// Full-panel background tint.
-	if cat == catStorm {
-		dc.SetRGB(0.98, 0.92, 0.92) // pale red
-	} else {
-		dc.SetRGB(0.94, 0.98, 0.94) // pale green
-	}
-	dc.DrawRectangle(0, 0, fw, float64(h))
-	dc.Fill()
 
 	cx := fw / 2
 	pad := 20.0
