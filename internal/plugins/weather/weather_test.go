@@ -26,9 +26,9 @@ func TestCodeInfo(t *testing.T) {
 		{95, catStorm, "Thunderstorm"},
 	}
 	for _, c := range cases {
-		cat, text := codeInfo(c.code)
+		cat, text, _ := codeInfo(c.code)
 		if cat != c.cat || text != c.text {
-			t.Errorf("codeInfo(%d) = (%d, %q), want (%d, %q)", c.code, cat, text, c.cat, c.text)
+			t.Errorf("codeInfo(%d) = (%d, %q, _), want (%d, %q, _)", c.code, cat, text, c.cat, c.text)
 		}
 	}
 }

@@ -86,8 +86,11 @@ func TestRenderFitsNarrowCanvas(t *testing.T) {
 	minX, maxX := b.Max.X, b.Min.X
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		for x := b.Min.X; x < b.Max.X; x++ {
-			r, g, bl, _ := img.At(x, y).RGBA()
-			if r|g|bl == 0 { // black pixel
+			r, g, b, _ := img.At(x, y).RGBA()
+		// Detect non-background (non-dark) pixels.  Color rendering makes the
+		// old black-check insufficient; the gradient sweep is faint but we only
+		// care about the bright text (well above 0.4 RGB after blending).
+		if float64(r)/65535 > 0.4 || float64(g)/65535 > 0.4 || float64(b)/65535 > 0.4 {
 				if x < minX {
 					minX = x
 				}

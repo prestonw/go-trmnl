@@ -185,7 +185,7 @@ func (p *Plugin) DataModel(ctx context.Context, in plugins.RenderInput) (any, er
 		return nil, err
 	}
 
-	_, cond := codeInfo(fc.Current.WeatherCode)
+	_, cond, _ := codeInfo(fc.Current.WeatherCode)
 	d := Data{
 		Place:     place,
 		TempUnit:  dispTemp,
