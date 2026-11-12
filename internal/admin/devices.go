@@ -95,9 +95,10 @@ func (h *Handler) DeviceUpdate(w http.ResponseWriter, r *http.Request) {
 	playlistID, _ := parseInt64(r.FormValue("playlist_id"))
 	bundle := r.FormValue("font_bundle")
 	showBattery := r.FormValue("show_battery") != ""
+	colorEnabled := r.FormValue("color_enabled") != ""
 	width := atoiDefault(r.FormValue("width"), 0)
 	height := atoiDefault(r.FormValue("height"), 0)
-	if err := h.store.UpdateDeviceSettings(id, name, refresh, nullInt(playlistID), bundle, showBattery, width, height); err != nil {
+	if err := h.store.UpdateDeviceSettings(id, name, refresh, nullInt(playlistID), bundle, showBattery, colorEnabled, width, height); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

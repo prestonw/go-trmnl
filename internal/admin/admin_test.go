@@ -290,7 +290,7 @@ func TestAdminForceRefreshRendersNextScreen(t *testing.T) {
 	pl, _ := st.CreatePlaylist("default")
 	st.AddPlaylistItem(pl.ID, sc.ID)
 	d, _ := st.CreateDevice(&store.Device{MAC: "AA:BB:CC:DD:EE:10", APIKey: "k", FriendlyID: "F10"})
-	if err := st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", true, 0, 0); err != nil {
+	if err := st.UpdateDeviceSettings(d.ID, "d.ID", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", true, false, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 

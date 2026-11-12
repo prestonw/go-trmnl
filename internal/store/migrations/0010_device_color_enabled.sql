@@ -1,0 +1,1 @@
+ALTER TABLE devices ADD COLUMN color_enabled INTEGER NOT NULL DEFAULT 0;

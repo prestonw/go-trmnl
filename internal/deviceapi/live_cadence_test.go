@@ -24,7 +24,7 @@ func TestDisplayLiveCadence(t *testing.T) {
 	pg, _ := st.CreatePlugin("clock", "Clock")
 	sc, _ := st.CreateScreen(pg.ID, "Clock", `{"use_24h":true,"label":"Office"}`)
 	st.AddPlaylistItem(pl.ID, sc.ID)
-	st.UpdateDeviceSettings(d.ID, "", 60, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, 0, 0)
+	st.UpdateDeviceSettings(d.ID, "d.ID", 60, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, false, 0, 0)
 
 	poll := func() (filename string, refresh int) {
 		resp := do(t, ts, http.MethodGet, "/api/display", map[string]string{

@@ -139,7 +139,7 @@ func TestUpdateDeviceSettingsAndCursor(t *testing.T) {
 	d := newDevice(t, st, "AA:BB:CC:DD:EE:04")
 	pl, _ := st.CreatePlaylist("P")
 
-	if err := st.UpdateDeviceSettings(d.ID, "Kitchen", 1200, sql.NullInt64{Int64: pl.ID, Valid: true}, "trmnl", true, 0, 0); err != nil {
+	if err := st.UpdateDeviceSettings(d.ID, "Kitchen", 1200, sql.NullInt64{Int64: pl.ID, Valid: true}, "trmnl", true, false, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := st.GetDeviceByID(d.ID)

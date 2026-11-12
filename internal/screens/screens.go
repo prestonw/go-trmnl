@@ -70,7 +70,13 @@ func Render(ctx context.Context, st *store.Store, r *render.Renderer, assetsDir 
 		level, charging := BatteryState(device)
 		render.DrawBatteryIndicator(img, level, charging)
 	}
-	res, err := r.Process(img, mode)
+
+	var res render.Result
+	if device != nil && device.ColorEnabled {
+		res, err = r.ProcessColor(img)
+	} else {
+		res, err = r.Process(img, mode)
+	}
 	if err != nil {
 		return render.Result{}, err
 	}

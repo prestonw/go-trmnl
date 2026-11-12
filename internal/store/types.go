@@ -30,6 +30,10 @@ type Device struct {
 	FontBundle      string
 	// ShowBattery draws a battery indicator in the rendered screen's footer.
 	ShowBattery bool
+	// ColorEnabled tells the render pipeline to emit 24-bit color BMPs for TFT
+	// LCD panels instead of 1-bit monochrome BMPs.  The device firmware must
+	// accept color BMPs for this to have an effect.
+	ColorEnabled bool
 }
 
 // DeviceLog is a single log entry reported by a device.

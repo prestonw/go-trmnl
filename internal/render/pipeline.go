@@ -50,6 +50,27 @@ func (r *Renderer) Process(src image.Image, mode Mode) (Result, error) {
 	return res, nil
 }
 
+// ProcessColor encodes src as a 24-bit color BMP without monochrome dithering.
+// The hash is derived from the raw RGBA pixel bytes so caching works the same.
+func (r *Renderer) ProcessColor(src image.Image) (Result, error) {
+	var buf bytes.Buffer
+	if err := EncodeColorBMP(&buf, src); err != nil {
+		return Result{}, err
+	}
+
+	sum := sha256.Sum256(buf.Bytes())
+	hash := hex.EncodeToString(sum[:16])
+	res := Result{Hash: hash, BMPName: hash + ".bmp", PNGName: hash + ".png"}
+
+	if err := r.writeIfAbsent(res.BMPName, func(buf *bytes.Buffer) error {
+		return EncodeColorBMP(buf, src)
+	}); err != nil {
+		return Result{}, err
+	}
+	// No PNG1 needed for color — keep the Result struct consistent.
+	return res, nil
+}
+
 func (r *Renderer) writeIfAbsent(name string, encode func(*bytes.Buffer) error) error {
 	path := filepath.Join(r.dir, name)
 	if _, err := os.Stat(path); err == nil {

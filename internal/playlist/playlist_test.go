@@ -27,7 +27,7 @@ func TestNextScreenRoundRobin(t *testing.T) {
 	}
 
 	d, _ := st.CreateDevice(&store.Device{MAC: "AA:BB:CC:DD:EE:01", APIKey: "k", FriendlyID: "F1"})
-	if err := st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, 0, 0); err != nil {
+	if err := st.UpdateDeviceSettings(d.ID, "d.ID", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, false, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -71,7 +71,7 @@ func TestPeekScreenDoesNotAdvance(t *testing.T) {
 	}
 
 	d, _ := st.CreateDevice(&store.Device{MAC: "AA:BB:CC:DD:EE:03", APIKey: "k", FriendlyID: "F3"})
-	if err := st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, 0, 0); err != nil {
+	if err := st.UpdateDeviceSettings(d.ID, "d.ID", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, false, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 
@@ -115,7 +115,7 @@ func TestNextScreenHoldsLiveScreen(t *testing.T) {
 	st.AddPlaylistItem(pl.ID, scB.ID)
 
 	d, _ := st.CreateDevice(&store.Device{MAC: "AA:BB:CC:DD:EE:02", APIKey: "testkey-hold-live", FriendlyID: "F2"})
-	if err := st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, 0, 0); err != nil {
+	if err := st.UpdateDeviceSettings(d.ID, "d.ID", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, false, 0, 0); err != nil {
 		t.Fatal(err)
 	}
 

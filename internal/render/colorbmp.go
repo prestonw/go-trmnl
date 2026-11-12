@@ -10,7 +10,7 @@ import (
 // EncodeColorBMP encodes img as a 24-bit BMP (BITMAPINFOHEADER, bottom-up, RGB).
 // This format is natively supported by ILI9341/ILI9488 TFT panels that expect
 // raw RGB565 or 24-bit pixels — the firmware simply blits the pixel data.
-func EncodeColorBMP(buf *bytes.Buffer, img *image.RGBA) error {
+func EncodeColorBMP(buf *bytes.Buffer, img image.Image) error {
 	b := img.Bounds()
 	w, h := b.Dx(), b.Dy()
 
@@ -55,11 +55,10 @@ func EncodeColorBMP(buf *bytes.Buffer, img *image.RGBA) error {
 	rgb := make([]byte, rowSize)
 	for row := h - 1; row >= 0; row-- {
 		for col := 0; col < w; col++ {
-			i := row*w + col
-			c := img.Pix[i*4 : i*4+4]
-			rgb[col*3+0] = c[2] // B (reverse for BMP)
-			rgb[col*3+1] = c[1] // G
-			rgb[col*3+2] = c[0] // R
+			r, g, b, _ := img.At(col, row).RGBA()
+			rgb[col*3+0] = uint8(b >> 8) // B
+			rgb[col*3+1] = uint8(g >> 8) // G
+			rgb[col*3+2] = uint8(r >> 8) // R
 		}
 		buf.Write(rgb) // includes padding
 	}

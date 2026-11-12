@@ -45,7 +45,7 @@ func TestDisplayRendersClockScreen(t *testing.T) {
 	pg, _ := st.CreatePlugin("clock", "Clock")
 	sc, _ := st.CreateScreen(pg.ID, "Clock", `{"use_24h":true,"label":"Office"}`)
 	st.AddPlaylistItem(pl.ID, sc.ID)
-	st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, 0, 0)
+	st.UpdateDeviceSettings(d.ID, "d.ID", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, false, 0, 0)
 
 	resp := do(t, ts, http.MethodGet, "/api/display", map[string]string{
 		"ID": testMAC, "Access-Token": d.APIKey,
@@ -93,7 +93,7 @@ func provisionDevice(t *testing.T, ts *httptest.Server, st *store.Store, mac str
 	if err != nil {
 		t.Fatalf("get device: %v", err)
 	}
-	if err := st.UpdateDeviceSettings(d.ID, "", 900, sql.NullInt64{Int64: playlistID, Valid: true}, "classic", battery, 0, 0); err != nil {
+	if err := st.UpdateDeviceSettings(d.ID, "d.ID", 900, sql.NullInt64{Int64: playlistID, Valid: true}, "classic", battery, false, 0, 0); err != nil {
 		t.Fatalf("settings: %v", err)
 	}
 	d, _ = st.GetDeviceByMAC(mac)
@@ -150,7 +150,7 @@ func TestDisplayRendersAtDevicePanelSize(t *testing.T) {
 	provisionDevice(t, ts, st, "AA:BB:CC:DD:EE:32", pl.ID, false)
 	portrait, _ := st.GetDeviceByMAC("AA:BB:CC:DD:EE:31")
 	standard, _ := st.GetDeviceByMAC("AA:BB:CC:DD:EE:32")
-	if err := st.UpdateDeviceSettings(portrait.ID, "", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, 320, 480); err != nil {
+	if err := st.UpdateDeviceSettings(portrait.ID, "portrait.ID", 900, sql.NullInt64{Int64: pl.ID, Valid: true}, "classic", false, false, 320, 480); err != nil {
 		t.Fatalf("settings: %v", err)
 	}
 
