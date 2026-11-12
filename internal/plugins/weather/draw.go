@@ -166,11 +166,20 @@ func drawForecast(dc *gg.Context, fs *plugins.FontSet, d Data, w int) {
 // top half = large time + date in a centered box,
 // bottom half = weather data in colored-card boxes.
 // Box outlines are colored by weather condition (gold=sun, blue=rain, red=storm alert).
-// A thick green frame runs along the inner screen edge.
+// Full-panel background tint: pale green for OK, pale red for alerts.
 func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	fw := float64(w)
 	cat, _, _ := codeInfo(d.Code)
 	col := boxOutline(cat)
+
+	// Full-panel background tint.
+	if cat == catStorm {
+		dc.SetRGB(0.98, 0.92, 0.92) // pale red
+	} else {
+		dc.SetRGB(0.94, 0.98, 0.94) // pale green
+	}
+	dc.DrawRectangle(0, 0, fw, float64(h))
+	dc.Fill()
 
 	cx := fw / 2
 	pad := 20.0
@@ -179,7 +188,7 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	// ========== TOP HALF: TIME ==========
 	topY := pad + 5.0
 	topH := 170.0
-	drawBox(dc, pad, topY, cw, topH, 5, col)
+	drawBox(dc, pad, topY, cw, topH, 6, col)
 
 	if d.Time != "" {
 		if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, d.Time, 56, cw); ok {
@@ -204,7 +213,7 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 
 	// Temp + icon card
 	tH := 75.0
-	drawBox(dc, pad, botY, cw, tH, 4, col)
+	drawBox(dc, pad, botY, cw, tH, 5, col)
 	drawIcon(dc, cat, 48, botY+tH/2, 34, col)
 	dc.SetRGB(0, 0, 0)
 	if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, fmt.Sprintf("%.0f°", d.Temp), 40, 140); ok {
@@ -251,12 +260,6 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 			cx, y, 0.5, 0.5,
 		)
 	}
-
-	// Thick green inner border — drawn last so it sits on top of box fills.
-	dc.SetRGB(0.22, 0.65, 0.22)
-	dc.SetLineWidth(8)
-	dc.DrawRectangle(4, 4, fw-8, float64(h)-8)
-	dc.Stroke()
 }
 
 // drawIcon draws a filled weather glyph centered at (cx, cy) sized by s,
