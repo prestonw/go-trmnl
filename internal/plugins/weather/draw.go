@@ -170,6 +170,7 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, _ int) {
 	dc.Stroke()
 
 	// Left column: time, date, sun times, humidity, wind.
+	// All text is black; minimum size is 22px (title size) for readability.
 	if d.Time != "" {
 		if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, d.Time, 42, wL); ok {
 			dc.SetFontFace(f)
@@ -177,40 +178,42 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, _ int) {
 		}
 	}
 	if d.Date != "" {
-		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, d.Date, 19, wL); ok {
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, d.Date, 22, wL); ok {
 			dc.SetFontFace(f)
 			dc.DrawStringAnchored(d.Date, cxL, 156, 0.5, 0.5)
 		}
 	}
 	if d.Sunrise != "" || d.Sunset != "" {
 		sun := fmt.Sprintf("%s - %s", d.Sunrise, d.Sunset)
-		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, sun, 17, wL); ok {
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, sun, 22, wL); ok {
 			dc.SetFontFace(f)
 			dc.DrawStringAnchored(sun, cxL, 196, 0.5, 0.5)
 		}
 	}
-	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Humidity %d%%", d.Humidity), 17, wL); ok {
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Humidity %d%%", d.Humidity), 22, wL); ok {
 		dc.SetFontFace(f)
 		dc.DrawStringAnchored(fmt.Sprintf("Humidity %d%%", d.Humidity), cxL, 252, 0.5, 0.5)
 	}
-	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Wind %.0f %s", d.Wind, d.WindUnit), 17, wL); ok {
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Wind %.0f %s", d.Wind, d.WindUnit), 22, wL); ok {
 		dc.SetFontFace(f)
 		dc.DrawStringAnchored(fmt.Sprintf("Wind %.0f %s", d.Wind, d.WindUnit), cxL, 282, 0.5, 0.5)
 	}
 
 	// Right column: icon, temperature, condition, feels-like.
+	// Icons are colored; all text is pure black for readability.
 	cat, _, col := codeInfo(d.Code)
 	drawIcon(dc, cat, cxR, 104, 46, col)
-	dc.SetColor(col)
+	dc.SetRGB(0, 0, 0) // reset to black after colored icon
+
 	if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, fmt.Sprintf("%.0f°", d.Temp), 44, wR); ok {
 		dc.SetFontFace(f)
 		dc.DrawStringAnchored(fmt.Sprintf("%.0f°", d.Temp), cxR, 172, 0.5, 0.5)
 	}
-	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, conditionFor(cat), 19, wR); ok {
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, conditionFor(cat), 22, wR); ok {
 		dc.SetFontFace(f)
 		dc.DrawStringAnchored(conditionFor(cat), cxR, 218, 0.5, 0.5)
 	}
-	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), 17, wR); ok {
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), 22, wR); ok {
 		dc.SetFontFace(f)
 		dc.DrawStringAnchored(fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), cxR, 258, 0.5, 0.5)
 	}
@@ -224,11 +227,11 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, _ int) {
 	for _, day := range d.Days {
 		c, _, col := codeInfo(day.Code)
 		drawIcon(dc, c, 36, y, 18, col)
-		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, day.Heading+" · "+conditionFor(cat), 19, fw/2-46); ok {
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, day.Heading+" · "+conditionFor(c), 22, fw/2-46); ok {
 			dc.SetFontFace(f)
-			dc.DrawStringAnchored(day.Heading+" · "+conditionFor(cat), 62, y, 0, 0.5)
+			dc.DrawStringAnchored(day.Heading+" · "+conditionFor(c), 62, y, 0, 0.5)
 		}
-		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("L %.0f° H %.0f° · %d%%", day.Lo, day.Hi, day.PrecipPct), 19, fw/2-46); ok {
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, fmt.Sprintf("L %.0f° H %.0f° · %d%%", day.Lo, day.Hi, day.PrecipPct), 22, fw/2-46); ok {
 			dc.SetFontFace(f)
 			dc.DrawStringAnchored(fmt.Sprintf("L %.0f° H %.0f° · %d%%", day.Lo, day.Hi, day.PrecipPct), fw-m, y, 1, 0.5)
 		}
@@ -238,13 +241,13 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, _ int) {
 
 // drawLabel draws the footer: a left label and the place (with no time, which
 // the device does not provide here) on the right.
+// All text is black, minimum 22px for readability.
 func drawLabel(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	text := d.Label
 	if text == "" {
 		text = "Weather"
 	}
-	// monochrome text stays black
-	setFace(dc, fs, 18, plugins.StyleSans)
+	setFace(dc, fs, 22, plugins.StyleSans)
 	dc.DrawStringAnchored(text, 40, float64(h)-20, 0, 0.5)
 	if d.Place != "" {
 		dc.DrawStringAnchored(d.Place, float64(w-d.FooterReserveRight)-40, float64(h)-20, 1, 0.5)
