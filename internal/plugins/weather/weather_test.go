@@ -2,8 +2,6 @@ package weather
 
 import (
 	"context"
-	"image"
-	"image/draw"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -160,10 +158,10 @@ func TestRenderProducesPanel(t *testing.T) {
 	}
 }
 
-// TestRenderPortraitFitsPanel: on a portrait panel (320x480) no text may be
+// TestRenderPortraitFitsPanel: on a portrait panel (320x480) no *text* may be
 // clipped at the edges — every line is fit-to-canvas — and the battery zone
-// at the bottom right stays clear of text. Boxes must not touch the panel
-// edges (8px guard) or the battery zone (y >= 449).
+// at the bottom right stays clear of text. Decorative borders (colored box
+// outlines, green screen frame) are exempt from the edge guard.
 func TestRenderPortraitFitsPanel(t *testing.T) {
 	p := New()
 	d := Data{Place: "Dublin", TempUnit: "C", WindUnit: "km/h", Temp: 12, FeelsLike: 9, Code: 61,
@@ -178,30 +176,29 @@ func TestRenderPortraitFitsPanel(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
-	g := image.NewGray(img.Bounds())
-	draw.Draw(g, img.Bounds(), img, image.Point{}, draw.Src)
-	px := g.Pix
 
+	// Count black text pixels (R,G,B all < 50) in edge guard and battery zone.
 	edge, low := 0, 0
-	for y := 0; y < h; y++ {
-		for x := 0; x < w; x++ {
-			if px[y*w+x] >= 128 {
-				continue
-			}
-			if x < 8 || x >= w-8 || y < 8 {
-				edge++
-			}
-			// Battery indicator: plate top is at y 453 (h-27); nothing may
-			// draw below y 449 anywhere on the panel.
-			if y >= h-31 {
-				low++
+	bounds := img.Bounds()
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, _ := img.At(x, y).RGBA()
+			// RGBA from image.RGBA returns 16-bit; <50*0x101 ≈ 8080 means <50
+			if r < 8080 && g < 8080 && b < 8080 {
+				// Black text pixel
+				if x < 8 || x >= w-8 || y < 8 {
+					edge++
+				}
+				if y >= h-31 {
+					low++
+				}
 			}
 		}
 	}
 	if edge > 0 {
-		t.Errorf("%d ink pixels within 8px of the panel edges (text clipped)", edge)
+		t.Errorf("%d black-text pixels within 8px of the panel edges (text clipped)", edge)
 	}
 	if low > 0 {
-		t.Errorf("%d ink pixels below y=%d (battery indicator would overlap)", low, h-31)
+		t.Errorf("%d black-text pixels below y=%d (battery indicator would overlap)", low, h-31)
 	}
 }

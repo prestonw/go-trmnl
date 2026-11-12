@@ -162,23 +162,24 @@ func drawForecast(dc *gg.Context, fs *plugins.FontSet, d Data, w int) {
 	}
 }
 
-// drawPortrait renders a clean grid layout on portrait panels:
+// drawPortrait renders a news-style grid on portrait panels:
 // top half = large time + date in a centered box,
 // bottom half = weather data in colored-card boxes.
 // Box outlines are colored by weather condition (gold=sun, blue=rain, red=storm alert).
-func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, _ int) {
+// A thick green frame runs along the inner screen edge.
+func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	fw := float64(w)
 	cat, _, _ := codeInfo(d.Code)
 	col := boxOutline(cat)
 
 	cx := fw / 2
-	pad := 10.0
-	cw := fw - 2*pad // 10px padding clears the 8px edge guard + 3px box stroke
+	pad := 20.0
+	cw := fw - 2*pad
 
 	// ========== TOP HALF: TIME ==========
 	topY := pad + 5.0
 	topH := 170.0
-	drawBox(dc, pad, topY, cw, topH, 3, col)
+	drawBox(dc, pad, topY, cw, topH, 5, col)
 
 	if d.Time != "" {
 		if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, d.Time, 56, cw); ok {
@@ -203,7 +204,7 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, _ int) {
 
 	// Temp + icon card
 	tH := 75.0
-	drawBox(dc, pad, botY, cw, tH, 3, col)
+	drawBox(dc, pad, botY, cw, tH, 4, col)
 	drawIcon(dc, cat, 48, botY+tH/2, 34, col)
 	dc.SetRGB(0, 0, 0)
 	if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, fmt.Sprintf("%.0f°", d.Temp), 40, 140); ok {
@@ -218,7 +219,7 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, _ int) {
 	rowH := 36.0
 	halfW := (cw - 12) / 2
 
-	drawBox(dc, pad, rowY, halfW, rowH, 2, col)
+	drawBox(dc, pad, rowY, halfW, rowH, 4, col)
 	setFace(dc, fs, 22, plugins.StyleSans)
 	dc.SetRGB(0, 0, 0)
 	dc.DrawStringAnchored(fmt.Sprintf("%d%%", d.Humidity), pad+halfW/2, rowY+20, 0.5, 0.5)
@@ -250,6 +251,12 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, _ int) {
 			cx, y, 0.5, 0.5,
 		)
 	}
+
+	// Thick green inner border — drawn last so it sits on top of box fills.
+	dc.SetRGB(0.22, 0.65, 0.22)
+	dc.SetLineWidth(8)
+	dc.DrawRectangle(4, 4, fw-8, float64(h)-8)
+	dc.Stroke()
 }
 
 // drawIcon draws a filled weather glyph centered at (cx, cy) sized by s,
