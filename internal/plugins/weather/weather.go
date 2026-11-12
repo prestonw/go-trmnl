@@ -310,7 +310,10 @@ func (p *Plugin) fetchForecast(ctx context.Context, lat, lon float64, tempUnit, 
 	u := p.forecastBase + "?" + q.Encode()
 
 	if e, ok := forecastCache[u]; ok && time.Since(e.at) < apiCacheTTL {
-		fc := e.value.(forecastResp)
+		fc, ok := e.value.(forecastResp)
+		if !ok {
+			continue
+		}
 		return &fc, nil
 	}
 	var out forecastResp
