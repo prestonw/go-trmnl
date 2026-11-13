@@ -100,10 +100,12 @@ func boxOutline(cat category) color.RGBA {
 	}
 }
 
-// drawBox renders a white card with a colored outline at the given width.
+// drawBox draws a filled white card with a colored outline.
+// The white fill masks the vibrant background tint so text stays readable.
 func drawBox(dc *gg.Context, x, y, w, h, lw float64, col color.RGBA) {
 	dc.SetRGB(1, 1, 1)
 	dc.DrawRectangle(x, y, w, h)
+	dc.Fill()
 	dc.SetColor(col)
 	dc.SetLineWidth(lw)
 	dc.Stroke()

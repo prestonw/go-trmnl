@@ -390,10 +390,10 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	img := image.NewRGBA(image.Rect(0, 0, in.Width, in.Height))
 
 	// Direct pixel fill — go-gg Fill() doesn't reliably fill large canvases.
-	tintR, tintG, tintB := uint8(240), uint8(250), uint8(240) // pale green default
+	tintR, tintG, tintB := uint8(64), uint8(190), uint8(96) // vibrant green default
 	cat, _, _ := codeInfo(d.Code)
 	if cat == catStorm {
-		tintR, tintG, tintB = uint8(250), uint8(235), uint8(235) // pale red
+		tintR, tintG, tintB = uint8(226), uint8(88), uint8(88) // vibrant red (storm)
 	}
 	for y := 0; y < in.Height; y++ {
 		row := y * in.Width * 4
