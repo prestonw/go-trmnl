@@ -331,7 +331,15 @@ func drawInkplate(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	midY := topY + topH + gap
 	midH := 88.0
 
-	inkplateBox(dc, lx, midY, lw, midH, 3)
+	// The middle row uses its own split, wider on the right: the feels/sun
+	// card needs ~260px of text, so the stat cards get 130px each instead
+	// of 105px. That lets the stat labels render at body size (28pt, same
+	// as "Feels like") and the values big, instead of one shrunken string.
+	mLw := 310.0
+	mRx := lx + mLw + gap
+	mRw := fw - mRx - pad
+
+	inkplateBox(dc, lx, midY, mLw, midH, 3)
 	setFace(dc, fs, 28, plugins.StyleSans)
 	dc.SetRGB(0, 0, 0)
 	dc.DrawStringAnchored(fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), lx+26, midY+30, 0, 0.5)
@@ -343,20 +351,47 @@ func drawInkplate(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	if len(d.Days) > 0 {
 		prepPct = d.Days[0].PrecipPct
 	}
-	stats := []string{
-		fmt.Sprintf("Humidity %d%%", d.Humidity),
-		fmt.Sprintf("Wind %.0f %s", d.Wind, d.WindUnit),
-		fmt.Sprintf("Rain %d%%", prepPct),
+	type inkStat struct {
+		label, value, unit string
 	}
-	sw := (rw - 2*gap) / 3
-	for i, s := range stats {
-		x := rx + float64(i)*(sw+gap)
+	stats := []inkStat{
+		{"Humidity", fmt.Sprintf("%d%%", d.Humidity), ""},
+		{"Wind", fmt.Sprintf("%.0f", d.Wind), d.WindUnit},
+		{"Rain", fmt.Sprintf("%d%%", prepPct), ""},
+	}
+	sw := (mRw - 2*gap) / 3
+	for i, st := range stats {
+		x := mRx + float64(i)*(sw+gap)
 		inkplateBox(dc, x, midY, sw, midH, 2)
-		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, s, 26, sw-16); ok {
+		cx := x + sw/2
+		// Label: body size, same 28pt as the "Feels like" line.
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, st.label, 28, sw-16); ok {
 			dc.SetFontFace(f)
 		}
 		dc.SetRGB(0, 0, 0)
-		dc.DrawStringAnchored(s, x+sw/2, midY+midH/2, 0.5, 0.5)
+		dc.DrawStringAnchored(st.label, cx, midY+24, 0.5, 0.5)
+		// Value: big number, unit smaller on the same baseline.
+		vf, okV := plugins.FitFace(dc, fs, plugins.StyleTitle, st.value, 40, sw-16)
+		dc.SetRGB(0, 0, 0)
+		if st.unit == "" || !okV {
+			dc.SetFontFace(vf)
+			dc.DrawStringAnchored(st.value, cx, midY+62, 0.5, 0.5)
+			continue
+		}
+		vw, _ := dc.MeasureString(st.value)
+		uf, errU := fs.Face(20, plugins.StyleSans)
+		if errU != nil {
+			dc.SetFontFace(vf)
+			dc.DrawStringAnchored(st.value, cx, midY+62, 0.5, 0.5)
+			continue
+		}
+		dc.SetFontFace(uf)
+		uw, _ := dc.MeasureString(st.unit)
+		x0 := cx - (vw+6+uw)/2
+		dc.SetFontFace(vf)
+		dc.DrawStringAnchored(st.value, x0, midY+62, 0, 0.5)
+		dc.SetFontFace(uf)
+		dc.DrawStringAnchored(st.unit, x0+vw+6, midY+62, 0, 0.5)
 	}
 
 	// ===== Forecast card (bottom, full width) =====
@@ -378,7 +413,7 @@ func drawInkplate(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 		dc.DrawStringAnchored(day.Heading, lx+96, ry, 0, 0.5)
 
 		setFace(dc, fs, 26, plugins.StyleSans)
-		dc.DrawStringAnchored(conditionFor(dcat), lx+260, ry, 0, 0.5)
+		dc.DrawStringAnchored(conditionFor(dcat), lx+300, ry, 0, 0.5)
 		dc.DrawStringAnchored(fmt.Sprintf("%.0f° / %.0f°", day.Lo, day.Hi), lx+480, ry, 0, 0.5)
 		dc.DrawStringAnchored(fmt.Sprintf("UV %d", day.UV), lx+640, ry, 0, 0.5)
 		// right edge stays clear on the last row for the battery indicator
