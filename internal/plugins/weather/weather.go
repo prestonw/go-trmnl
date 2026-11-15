@@ -62,6 +62,7 @@ type settings struct {
 	Label           string  `json:"label"`            // shown in the corner
 	Timezone        string  `json:"timezone"`         // IANA name for the clock column; empty == server local
 	Use24h          *bool   `json:"use_24h"`          // clock column format; unset == true (device clock is 24h)
+	Theme           string  `json:"theme"`            // "inkplate" = 1-bit B/W grid for e-paper; empty = classic
 }
 
 // clock24h reports the default clock-column format: 24-hour, to match the
@@ -139,6 +140,9 @@ type Data struct {
 	Sunset    string // "21:40"
 
 	Days []DayForecast
+	// Inkplate selects the 1-bit e-paper layout (white background, black
+	// text/icons, light-grey card fills dithered by the 1-bit pipeline).
+	Inkplate bool
 	// FooterReserve is horizontal space kept free at the bottom right for the
 	// server-drawn battery indicator; see plugins.RenderInput.
 	FooterReserveRight int
@@ -199,6 +203,7 @@ func (p *Plugin) DataModel(ctx context.Context, in plugins.RenderInput) (any, er
 		Wind:      fc.Current.WindSpeed,
 		Sunrise:   hhmm(at(fc.Daily.Sunrise, 0)),
 		Sunset:    hhmm(at(fc.Daily.Sunset, 0)),
+		Inkplate:  s.Theme == "inkplate",
 	}
 	for i := range fc.Daily.Time {
 		if i >= 2 {
@@ -390,10 +395,17 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	img := image.NewRGBA(image.Rect(0, 0, in.Width, in.Height))
 
 	// Direct pixel fill — go-gg Fill() doesn't reliably fill large canvases.
-	tintR, tintG, tintB := uint8(64), uint8(190), uint8(96) // vibrant green default
-	cat, _, _ := codeInfo(d.Code)
-	if cat == catStorm {
-		tintR, tintG, tintB = uint8(226), uint8(88), uint8(88) // vibrant red (storm)
+	var tintR, tintG, tintB uint8
+	if d.Inkplate {
+		// E-paper: white field; grey card fills are dithered by the 1-bit
+		// pipeline (Floyd-Steinberg) into a faint dot pattern.
+		tintR, tintG, tintB = uint8(255), uint8(255), uint8(255)
+	} else {
+		tintR, tintG, tintB = uint8(64), uint8(190), uint8(96) // vibrant green default
+		cat, _, _ := codeInfo(d.Code)
+		if cat == catStorm {
+			tintR, tintG, tintB = uint8(226), uint8(88), uint8(88) // vibrant red (storm)
+		}
 	}
 	for y := 0; y < in.Height; y++ {
 		row := y * in.Width * 4
@@ -408,6 +420,11 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 
 	dc := gg.NewContextForRGBA(img)
 	dc.SetRGB(0, 0, 0)
+
+	if d.Inkplate {
+		drawInkplate(dc, in.Fonts, d, in.Width, in.Height)
+		return img, nil
+	}
 
 	if in.Height > in.Width {
 		drawPortrait(dc, in.Fonts, d, in.Width, in.Height)

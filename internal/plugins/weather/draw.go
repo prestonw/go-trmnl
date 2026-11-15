@@ -255,6 +255,136 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	}
 }
 
+// inkplateFill is the light-grey card fill for the e-paper layout. The 1-bit
+// render pipeline dithers it (Floyd-Steinberg) into a faint dot pattern that
+// reads as light grey on the panel.
+var inkplateFill = color.RGBA{216, 216, 216, 255}
+
+// inkplateBlack is the single ink color used for all icons, text, and
+// outlines in the e-paper layout.
+var inkplateBlack = color.RGBA{0, 0, 0, 255}
+
+// inkplateBox draws a light-grey card with a black outline.
+func inkplateBox(dc *gg.Context, x, y, w, h, lw float64) {
+	dc.SetColor(inkplateFill)
+	dc.DrawRectangle(x, y, w, h)
+	dc.Fill()
+	dc.SetColor(inkplateBlack)
+	dc.SetLineWidth(lw)
+	dc.Stroke()
+}
+
+// drawInkplate renders the 1-bit e-paper dashboard (800x600 landscape):
+// white field, light-grey cards with black outlines, all-black text and
+// icons. Same content as the Waveshare dashboard, rescaled for the panel.
+// The bottom-right corner is left free for the server-drawn battery
+// indicator.
+func drawInkplate(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
+	fw, fh := float64(w), float64(h)
+	pad := 20.0
+	gap := 20.0
+
+	lx, lw := pad, fw*0.48
+	rx := lx + lw + gap
+	rw := fw - rx - pad
+
+	// ===== Time card (top left) =====
+	topY := pad
+	topH := fh*0.42
+	inkplateBox(dc, lx, topY, lw, topH, 4)
+	cx := lx + lw/2
+	if d.Time != "" {
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, d.Time, 110, lw-40); ok {
+			dc.SetFontFace(f)
+		}
+		dc.SetRGB(0, 0, 0)
+		dc.DrawStringAnchored(d.Time, cx, topY+topH*0.36, 0.5, 0.5)
+	}
+	if d.Date != "" {
+		setFace(dc, fs, 34, plugins.StyleSans)
+		dc.SetRGB(0, 0, 0)
+		dc.DrawStringAnchored(d.Date, cx, topY+topH*0.64, 0.5, 0.5)
+	}
+	if d.Place != "" {
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, d.Place, 28, lw-40); ok {
+			dc.SetFontFace(f)
+		}
+		dc.SetRGB(0, 0, 0)
+		dc.DrawStringAnchored(d.Place, cx, topY+topH*0.85, 0.5, 0.5)
+	}
+
+	// ===== Temp card (top right) =====
+	cat, _, _ := codeInfo(d.Code)
+	inkplateBox(dc, rx, topY, rw, topH, 4)
+	drawIcon(dc, cat, rx+62, topY+topH/2, 68, inkplateBlack)
+	tempStr := fmt.Sprintf("%.0f°", d.Temp)
+	if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, tempStr, 96, rw-160); ok {
+		dc.SetFontFace(f)
+	}
+	dc.SetRGB(0, 0, 0)
+	dc.DrawStringAnchored(tempStr, rx+150, topY+topH/2-26, 0, 0.5)
+	setFace(dc, fs, 30, plugins.StyleSans)
+	dc.SetRGB(0, 0, 0)
+	dc.DrawStringAnchored(d.CondLabel, rx+150, topY+topH/2+34, 0, 0.5)
+
+	// ===== Middle row: feels/sun card (left), three stat cards (right) =====
+	midY := topY + topH + gap
+	midH := 88.0
+
+	inkplateBox(dc, lx, midY, lw, midH, 3)
+	setFace(dc, fs, 28, plugins.StyleSans)
+	dc.SetRGB(0, 0, 0)
+	dc.DrawStringAnchored(fmt.Sprintf("Feels like %.0f°%s", d.FeelsLike, d.TempUnit), lx+26, midY+30, 0, 0.5)
+	if d.Sunrise != "" || d.Sunset != "" {
+		dc.DrawStringAnchored(fmt.Sprintf("Sun %s - %s", d.Sunrise, d.Sunset), lx+26, midY+62, 0, 0.5)
+	}
+
+	prepPct := 0
+	if len(d.Days) > 0 {
+		prepPct = d.Days[0].PrecipPct
+	}
+	stats := []string{
+		fmt.Sprintf("Humidity %d%%", d.Humidity),
+		fmt.Sprintf("Wind %.0f %s", d.Wind, d.WindUnit),
+		fmt.Sprintf("Rain %d%%", prepPct),
+	}
+	sw := (rw - 2*gap) / 3
+	for i, s := range stats {
+		x := rx + float64(i)*(sw+gap)
+		inkplateBox(dc, x, midY, sw, midH, 2)
+		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, s, 26, sw-16); ok {
+			dc.SetFontFace(f)
+		}
+		dc.SetRGB(0, 0, 0)
+		dc.DrawStringAnchored(s, x+sw/2, midY+midH/2, 0.5, 0.5)
+	}
+
+	// ===== Forecast card (bottom, full width) =====
+	frY := midY + midH + gap
+	frH := fh - frY - pad
+	inkplateBox(dc, pad, frY, fw-2*pad, frH, 3)
+
+	for i := range d.Days {
+		if i >= 2 {
+			break
+		}
+		day := d.Days[i]
+		dcat, _, _ := codeInfo(day.Code)
+		ry := frY + 46 + float64(i)*62
+		drawIcon(dc, dcat, lx+44, ry, 30, inkplateBlack)
+
+		setFace(dc, fs, 32, plugins.StyleTitle)
+		dc.SetRGB(0, 0, 0)
+		dc.DrawStringAnchored(day.Heading, lx+96, ry, 0, 0.5)
+
+		setFace(dc, fs, 26, plugins.StyleSans)
+		dc.DrawStringAnchored(conditionFor(dcat), lx+260, ry, 0, 0.5)
+		dc.DrawStringAnchored(fmt.Sprintf("%.0f° / %.0f°", day.Lo, day.Hi), lx+480, ry, 0, 0.5)
+		dc.DrawStringAnchored(fmt.Sprintf("UV %d", day.UV), lx+640, ry, 0, 0.5)
+		// right edge stays clear on the last row for the battery indicator
+	}
+}
+
 // drawIcon draws a filled weather glyph centered at (cx, cy) sized by s,
 // using col for the primary fills.
 func drawIcon(dc *gg.Context, cat category, cx, cy, s float64, col color.RGBA) {
