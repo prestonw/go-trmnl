@@ -120,10 +120,11 @@ func (h *Handler) cachedHash(d *store.Device, screen *store.Screen, ttl time.Dur
 		if err != nil || !ok {
 			return "", false
 		}
-		// The indicator is part of the image, so a changed battery level has to
-		// invalidate the cache even while the plugin's refresh interval holds.
-		level, charging := screens.BatteryState(d)
-		if cachedState != render.BatteryState(level, charging) {
+		// The indicator is part of the image, so a changed battery level or
+		// charge figure has to invalidate the cache even while the plugin's
+		// refresh interval holds.
+		level, charging, percent := screens.BatteryState(d)
+		if cachedState != render.BatteryState(level, charging, percent) {
 			return "", false
 		}
 	} else {

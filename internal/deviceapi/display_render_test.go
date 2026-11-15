@@ -194,9 +194,9 @@ func TestBatteryIndicatorRendersPerDevice(t *testing.T) {
 		t.Errorf("second poll re-rendered: %q != %q", again, batteryName)
 	}
 
-	// A voltage within the same level keeps the image; a lower level changes it.
-	if same := displayFilename(t, ts, withBattery, "4.05"); same != batteryName {
-		t.Errorf("4.05 V changed the image although it is the same level: %q != %q", same, batteryName)
+	// A voltage within the same 5 % step keeps the image; a lower level changes it.
+	if same := displayFilename(t, ts, withBattery, "3.96"); same != batteryName {
+		t.Errorf("3.96 V changed the image although it is the same 5%% step: %q != %q", same, batteryName)
 	}
 	if lower := displayFilename(t, ts, withBattery, "3.35"); lower == batteryName {
 		t.Error("an empty battery drew the same image as a full one")

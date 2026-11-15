@@ -32,7 +32,7 @@ func darkPixels(img *image.RGBA, r image.Rectangle) int {
 // otherwise it covers their footer text.
 func TestBatteryIndicatorStaysInReservedArea(t *testing.T) {
 	img := blank()
-	render.DrawBatteryIndicator(img, render.BatteryFull, false)
+	render.DrawBatteryIndicator(img, render.BatteryFull, false, 85)
 
 	reserved := image.Rect(render.Width-render.BatteryFooterWidth, render.Height-40, render.Width, render.Height)
 	if got := darkPixels(img, reserved); got == 0 {
@@ -44,6 +44,21 @@ func TestBatteryIndicatorStaysInReservedArea(t *testing.T) {
 	}
 }
 
+// The percent figure must draw more ink than the icon alone, and only inside
+// the reserved strip to the left of the icon.
+func TestBatteryPercentDrawsFigure(t *testing.T) {
+	plain, withPercent := blank(), blank()
+	render.DrawBatteryIndicator(plain, render.BatteryFull, false, 0)
+	render.DrawBatteryIndicator(withPercent, render.BatteryFull, false, 85)
+	if darkPixels(plain, plain.Bounds()) >= darkPixels(withPercent, withPercent.Bounds()) {
+		t.Fatal("the 85% figure did not add ink")
+	}
+	strip := image.Rect(render.Width-render.BatteryFooterWidth, render.Height-40, render.Width-render.BatteryFooterWidth+40, render.Height)
+	if darkPixels(withPercent, strip) == 0 {
+		t.Error("no ink in the figure's strip left of the icon")
+	}
+}
+
 // More charge must mean more ink: the bars are the whole point.
 func TestBatteryLevelsDifferVisibly(t *testing.T) {
 	prev := -1
@@ -52,7 +67,7 @@ func TestBatteryLevelsDifferVisibly(t *testing.T) {
 		render.BatteryMedium, render.BatteryFull,
 	} {
 		img := blank()
-		render.DrawBatteryIndicator(img, level, false)
+		render.DrawBatteryIndicator(img, level, false, 0)
 		n := darkPixels(img, img.Bounds())
 		if n <= prev {
 			t.Errorf("level %d drew %d dark pixels, not more than the previous %d", level, n, prev)
@@ -63,8 +78,8 @@ func TestBatteryLevelsDifferVisibly(t *testing.T) {
 
 func TestBatteryChargingAddsBolt(t *testing.T) {
 	plain, charging := blank(), blank()
-	render.DrawBatteryIndicator(plain, render.BatteryLow, false)
-	render.DrawBatteryIndicator(charging, render.BatteryLow, true)
+	render.DrawBatteryIndicator(plain, render.BatteryLow, false, 0)
+	render.DrawBatteryIndicator(charging, render.BatteryLow, true, 0)
 	if darkPixels(plain, plain.Bounds()) == darkPixels(charging, charging.Bounds()) {
 		t.Error("charging state did not change the drawing")
 	}
@@ -89,15 +104,42 @@ func TestBatteryLevelFor(t *testing.T) {
 	}
 }
 
-// The image is cached by content hash, so small voltage moves within a level
-// must not produce a new image.
+// The image is cached by content hash, so voltages inside the same 5 % step
+// must not produce a new image, and crossing a step must.
 func TestBatteryDrawingIsStableWithinALevel(t *testing.T) {
 	a, b := blank(), blank()
-	render.DrawBatteryIndicator(a, render.BatteryLevelFor(3.71), false)
-	render.DrawBatteryIndicator(b, render.BatteryLevelFor(3.88), false)
+	// Both 3.90 V and 3.91 V are 75 % (same step, same level).
+	render.DrawBatteryIndicator(a, render.BatteryLevelFor(3.90), false, render.BatteryPercent(3.90))
+	render.DrawBatteryIndicator(b, render.BatteryLevelFor(3.91), false, render.BatteryPercent(3.91))
 	for i := range a.Pix {
 		if a.Pix[i] != b.Pix[i] {
-			t.Fatal("3.71 V and 3.88 V drew different images although both are 'medium'")
+			t.Fatal("3.90 V and 3.91 V drew different images although both are 75 %")
+		}
+	}
+	// 3.99 V is 85 %: the figure must change the picture.
+	c := blank()
+	render.DrawBatteryIndicator(c, render.BatteryLevelFor(3.99), false, render.BatteryPercent(3.99))
+	if darkPixels(a, a.Bounds()) == darkPixels(c, c.Bounds()) {
+		t.Fatal("3.90 V (75 %) and 3.99 V (85 %) drew identical images")
+	}
+}
+
+func TestBatteryPercent(t *testing.T) {
+	for _, tc := range []struct {
+		volts float64
+		want  int
+	}{
+		{0, 0},
+		{2.5, 0},   // clamped at the floor
+		{3.0, 0},   // floor
+		{3.07, 5},  // first step
+		{3.6, 50},  // middle
+		{3.9, 75},  // quarter-point, exactly on a step
+		{4.2, 100}, // full
+		{4.5, 100}, // clamped at the ceiling
+	} {
+		if got := render.BatteryPercent(tc.volts); got != tc.want {
+			t.Errorf("BatteryPercent(%.2f) = %d, want %d", tc.volts, got, tc.want)
 		}
 	}
 }

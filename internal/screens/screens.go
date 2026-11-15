@@ -67,8 +67,8 @@ func Render(ctx context.Context, st *store.Store, r *render.Renderer, assetsDir 
 		return render.Result{}, err
 	}
 	if battery {
-		level, charging := BatteryState(device)
-		render.DrawBatteryIndicator(img, level, charging)
+		level, charging, percent := BatteryState(device)
+		render.DrawBatteryIndicator(img, level, charging, percent)
 	}
 
 	var res render.Result
@@ -83,8 +83,8 @@ func Render(ctx context.Context, st *store.Store, r *render.Renderer, assetsDir 
 	// A screen with the indicator or a non-standard size looks different per
 	// device, so it cannot go into the shared per-screen cache.
 	if own {
-		level, charging := BatteryState(device)
-		_ = st.SetDeviceScreenRender(device.ID, sc.ID, res.Hash, render.BatteryState(level, charging))
+		level, charging, percent := BatteryState(device)
+		_ = st.SetDeviceScreenRender(device.ID, sc.ID, res.Hash, render.BatteryState(level, charging, percent))
 	} else {
 		_ = st.SetScreenRendered(sc.ID, res.Hash)
 	}
@@ -100,15 +100,18 @@ func DeviceHasNonStandardSize(d *store.Device) bool {
 }
 
 // BatteryState reports what the footer indicator would show for a device: its
-// coarse charge level and whether it reported itself as charging. Telemetry a
-// device has never sent leaves the level unknown.
-func BatteryState(d *store.Device) (render.BatteryLevel, bool) {
+// coarse charge level, whether it reported itself as charging, and the coarse
+// percentage printed next to the icon (0 until telemetry arrives).
+func BatteryState(d *store.Device) (render.BatteryLevel, bool, int) {
 	if d == nil {
-		return render.BatteryUnknown, false
+		return render.BatteryUnknown, false, 0
 	}
 	level := render.BatteryUnknown
+	percent := 0
 	if d.BatteryVoltage.Valid {
-		level = render.BatteryLevelFor(d.BatteryVoltage.Float64)
+		volts := d.BatteryVoltage.Float64
+		level = render.BatteryLevelFor(volts)
+		percent = render.BatteryPercent(volts)
 	}
-	return level, d.BatteryCharging.Valid && d.BatteryCharging.Bool
+	return level, d.BatteryCharging.Valid && d.BatteryCharging.Bool, percent
 }
