@@ -66,6 +66,19 @@ type displayResponse struct {
 	SpecialFunction    string  `json:"special_function"`
 	ImageURLTimeout    int     `json:"image_url_timeout"`
 	TemperatureProfile string  `json:"temperature_profile"`
+	Clock              *Clock  `json:"clock,omitempty"`
+}
+
+// Clock config: when present, the device draws the clock locally using its RTC
+// and partial updates instead of relying on the server-rendered image.
+type Clock struct {
+	Enabled bool   `json:"enabled"`
+	X       int    `json:"x"`          // top-left X (px)
+	Y       int    `json:"y"`          // top-left Y (px)
+	Width   int    `json:"w"`          // zone width (px)
+	Height  int    `json:"h"`          // zone height (px)
+	Font    int    `json:"font_size"`  // base font size
+	Format  string `json:"format"`     // "24h" or "12h"
 }
 
 // Display persists telemetry from request headers and returns the screen to
@@ -97,6 +110,64 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 		firmwareURL = &d.FirmwareURL.String
 	}
 
+	// Build clock config from the screen's settings if present.
+	// The device will redraw the clock locally via light-sleep RTC ticks.
+	var clockCfg *Clock
+	if img.screen != nil && img.screen.SettingsJSON != "" {
+		var screenSettings struct {
+			DrawClock  *bool `json:"draw_clock"`
+			ClockX     *int  `json:"clock_x"`
+			ClockY     *int  `json:"clock_y"`
+			ClockW     *int  `json:"clock_w"`
+			ClockH     *int  `json:"clock_h"`
+			ClockFont  *int  `json:"clock_font_size"`
+			Clock24h   *bool `json:"clock_24h"`
+			Timezone   string `json:"timezone"`
+		}
+		if err := json.Unmarshal([]byte(img.screen.SettingsJSON), &screenSettings); err == nil {
+			showClock := false
+			if screenSettings.DrawClock != nil && *screenSettings.DrawClock {
+				showClock = true
+			}
+			if showClock {
+				font := 110
+				if screenSettings.ClockFont != nil && *screenSettings.ClockFont > 0 {
+					font = *screenSettings.ClockFont
+				}
+				fm := "24h"
+				if screenSettings.Clock24h != nil && !*screenSettings.Clock24h {
+					fm = "12h"
+				}
+				// Default zone: top-left time card area on 800x600 landscape
+				x := 20
+				y := 20
+				w := 384
+				h := 252
+				if screenSettings.ClockX != nil && *screenSettings.ClockX > 0 {
+					x = *screenSettings.ClockX
+				}
+				if screenSettings.ClockY != nil && *screenSettings.ClockY > 0 {
+					y = *screenSettings.ClockY
+				}
+				if screenSettings.ClockW != nil && *screenSettings.ClockW > 0 {
+					w = *screenSettings.ClockW
+				}
+				if screenSettings.ClockH != nil && *screenSettings.ClockH > 0 {
+					h = *screenSettings.ClockH
+				}
+				clockCfg = &Clock{
+					Enabled: true,
+					X:       x,
+					Y:       y,
+					Width:   w,
+					Height:  h,
+					Font:    font,
+					Format:  fm,
+				}
+			}
+		}
+	}
+
 	httpx.WriteJSON(w, http.StatusOK, displayResponse{
 		Status:             0,
 		ImageURL:           h.imageURL(img.urlName),
@@ -108,6 +179,7 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 		SpecialFunction:    special,
 		ImageURLTimeout:    0,
 		TemperatureProfile: "default",
+		Clock:              clockCfg,
 	})
 
 	// Firmware update and reset are one-shot: clear them after serving so the

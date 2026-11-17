@@ -63,6 +63,7 @@ type settings struct {
 	Timezone        string  `json:"timezone"`         // IANA name for the clock column; empty == server local
 	Use24h          *bool   `json:"use_24h"`          // clock column format; unset == true (device clock is 24h)
 	Theme           string  `json:"theme"`            // "inkplate" = 1-bit B/W grid for e-paper; empty = classic
+	DrawClock       *bool   `json:"draw_clock"`       // when false (or missing), the server skips clock text; device draws it locally
 }
 
 // clock24h reports the default clock-column format: 24-hour, to match the
@@ -146,6 +147,9 @@ type Data struct {
 	// FooterReserve is horizontal space kept free at the bottom right for the
 	// server-drawn battery indicator; see plugins.RenderInput.
 	FooterReserveRight int
+	// SkipClock, when true, tells the inkplate renderer to leave the time card
+	// text blank — the device will draw the clock locally via RTC.
+	SkipClock bool
 }
 
 // DayForecast is one day in the forecast strip.
@@ -190,6 +194,10 @@ func (p *Plugin) DataModel(ctx context.Context, in plugins.RenderInput) (any, er
 	}
 
 	_, cond, _ := codeInfo(fc.Current.WeatherCode)
+	drawClock := true
+	if s.DrawClock != nil {
+		drawClock = *s.DrawClock
+	}
 	d := Data{
 		Place:     place,
 		TempUnit:  dispTemp,
@@ -204,6 +212,7 @@ func (p *Plugin) DataModel(ctx context.Context, in plugins.RenderInput) (any, er
 		Sunrise:   hhmm(at(fc.Daily.Sunrise, 0)),
 		Sunset:    hhmm(at(fc.Daily.Sunset, 0)),
 		Inkplate:  s.Theme == "inkplate",
+		SkipClock: !drawClock,
 	}
 	for i := range fc.Daily.Time {
 		if i >= 2 {

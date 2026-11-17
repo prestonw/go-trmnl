@@ -293,7 +293,9 @@ func drawInkplate(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	topH := fh*0.42
 	inkplateBox(dc, lx, topY, lw, topH, 4)
 	cx := lx + lw/2
-	if d.Time != "" {
+	// Clock text is drawn locally by the device via RTC. Only date/place
+	// are baked into the server image when SkipClock is true.
+	if !d.SkipClock && d.Time != "" {
 		if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, d.Time, 110, lw-40); ok {
 			dc.SetFontFace(f)
 		}
