@@ -47,6 +47,27 @@
           <option value="imperial" {{if eq .FCUnits "imperial"}}selected{{end}}>Imperial (°F, mph)</option>
         </select>
       </label>
+      {{else if .IsWeather}}
+      <h3>Location</h3>
+      <label>Location name <input type="text" name="wc_location" value="{{.WCLocation}}" placeholder="e.g. Dublin"></label>
+      <label>Latitude <input type="number" name="wc_latitude" value="{{.WCLatitude}}" step="any"></label>
+      <label>Longitude <input type="number" name="wc_longitude" value="{{.WCLongitude}}" step="any"></label>
+      <label>Units
+        <select name="wc_units">
+          <option value="metric" {{if eq .WCUnits "metric"}}selected{{end}}>Metric (°C, km/h)</option>
+          <option value="imperial" {{if eq .WCUnits "imperial"}}selected{{end}}>Imperial (°F, mph)</option>
+        </select>
+      </label>
+      <label>Label <input type="text" name="wc_label" value="{{.WCLabel}}" placeholder="optional corner label"></label>
+      <label>Timezone <input type="text" name="wc_timezone" value="{{.WCTimezone}}" placeholder="e.g. Europe/Dublin (empty = server local)"></label>
+
+      <h3>Clock</h3>
+      <label class="check"><input type="checkbox" name="wc_draw_clock" {{if .WCDrawClock}}checked{{end}}> Device draws the clock locally (server leaves the time card blank)</label>
+      <p class="muted" style="font-size: 0.9em;">When enabled the weather screen's time card is rendered without a time — the device draws the clock from its own RTC and ticks it forward each minute with a partial e-paper pulse (radio off by default). When disabled the server bakes the current time into the image on each render.</p>
+      <label class="check"><input type="checkbox" name="wc_use_24h" {{if .WCUse24h}}checked{{end}}> 24-hour time</label>
+      <label>Partial refresh interval (seconds) <input type="number" name="wc_partial_refresh" value="{{.WCPartialRefresh}}" min="60" max="3600" step="60"></label>
+      <p class="muted" style="font-size: 0.9em;">Whole minutes between local ticks (60–3600, step 60). Each wake redraws only the time digits with a partial update; the radio stays off.</p>
+      <label class="check"><input type="checkbox" name="wc_partial_refresh_wifi" {{if .WCPartialRefreshWiFi}}checked{{end}}> Enable Wi-Fi on partial refresh wakes <span class="muted">(off by default; for live data like tickers / MQTT)</span></label>
       {{else}}
       <label>Settings (JSON)
         <textarea name="settings_json" rows="10">{{$s.SettingsJSON}}</textarea>

@@ -103,6 +103,7 @@ func (h *Handler) ScreenDetail(w http.ResponseWriter, r *http.Request) {
 		"PluginType":       pluginType,
 		"IsImage":          pluginType == "staticimage",
 		"IsFamilyCalendar": pluginType == "familycalendar",
+		"IsWeather":        pluginType == "weather",
 		"DitherMode":       dither,
 		"GlobalDither":     globalDither,
 		"RefreshSeconds":   refreshSecs,
@@ -115,6 +116,9 @@ func (h *Handler) ScreenDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	if pluginType == "familycalendar" {
 		h.addFamilyCalendarSettings(data, sc.SettingsJSON)
+	}
+	if pluginType == "weather" {
+		h.addWeatherSettings(data, sc.SettingsJSON)
 	}
 	h.render(w, "screen", data)
 }
@@ -188,8 +192,12 @@ func (h *Handler) ScreenUpdate(w http.ResponseWriter, r *http.Request) {
 	// fields. Other plugins use the JSON textarea.
 	var settings string
 	if sc, gerr := h.store.GetScreen(id); gerr == nil {
-		if pg, perr := h.store.GetPlugin(sc.PluginID); perr == nil && pg.Type == "familycalendar" {
-			settings = familyCalendarSettings(r)
+		if pg, perr := h.store.GetPlugin(sc.PluginID); perr == nil {
+			if pg.Type == "familycalendar" {
+				settings = familyCalendarSettings(r)
+			} else if pg.Type == "weather" {
+				settings = weatherSettings(r)
+			}
 		}
 	}
 	if settings == "" {
@@ -367,6 +375,110 @@ func familyCalendarSettings(r *http.Request) string {
 	if err != nil {
 		return "{}"
 	}
+	return string(b)
+}
+
+// addWeatherSettings populates the weather clock form fields from the
+// screen's settings JSON so the admin page can show the current values.
+func (h *Handler) addWeatherSettings(data map[string]any, settingsJSON string) {
+	var ws struct {
+		Location           string  `json:"location"`
+		Latitude           float64 `json:"latitude"`
+		Longitude          float64 `json:"longitude"`
+		Units              string  `json:"units"`
+		Label              string  `json:"label"`
+		Theme              string  `json:"theme"`
+		Timezone           string  `json:"timezone"`
+		Use24h             *bool   `json:"use_24h"`
+		DrawClock          *bool   `json:"draw_clock"`
+		PartialRefresh     *int    `json:"partial_refresh"`
+		PartialRefreshWiFi *bool   `json:"partial_refresh_wifi"`
+	}
+	_ = json.Unmarshal([]byte(settingsJSON), &ws)
+
+	if ws.Units == "" {
+		ws.Units = "metric"
+	}
+	use24h := true
+	if ws.Use24h != nil {
+		use24h = *ws.Use24h
+	}
+	drawClock := false
+	if ws.DrawClock != nil {
+		drawClock = *ws.DrawClock
+	}
+	partial := 60
+	if ws.PartialRefresh != nil && *ws.PartialRefresh > 0 {
+		partial = *ws.PartialRefresh
+	}
+	partialWiFi := false
+	if ws.PartialRefreshWiFi != nil {
+		partialWiFi = *ws.PartialRefreshWiFi
+	}
+
+	data["WCLocation"]  = ws.Location
+	data["WCLatitude"]  = ws.Latitude
+	data["WCLongitude"] = ws.Longitude
+	data["WCUnits"]     = ws.Units
+	data["WCLabel"]     = ws.Label
+	data["WCTimezone"]  = ws.Timezone
+	data["WCUse24h"]    = use24h
+	data["WCDrawClock"] = drawClock
+	data["WCPartialRefresh"]  = partial
+	data["WCPartialRefreshWiFi"] = partialWiFi
+}
+
+// weatherSettings composes the weather screen settings JSON from the admin
+// form fields. All location/units keys are omitted when empty so the plugin
+// can apply its own defaults.
+func weatherSettings(r *http.Request) string {
+	_ = r.ParseForm()
+	m := map[string]any{}
+
+	if v := r.FormValue("wc_location"); v != "" {
+		m["location"] = v
+	}
+	if v, err := strconv.ParseFloat(r.FormValue("wc_latitude"), 64); err == nil && v != 0 {
+		m["latitude"] = v
+	}
+	if v, err := strconv.ParseFloat(r.FormValue("wc_longitude"), 64); err == nil && v != 0 {
+		m["longitude"] = v
+	}
+	if v := r.FormValue("wc_units"); v != "" {
+		m["units"] = v
+	}
+	if v := r.FormValue("wc_label"); v != "" {
+		m["label"] = v
+	}
+	if v := r.FormValue("wc_timezone"); v != "" {
+		m["timezone"] = v
+	}
+	// Theme is always "inkplate" for this fork.
+	m["theme"] = "inkplate"
+
+	// Clock ownership: draw_clock=true means the device draws the clock
+	// locally (server leaves the time card blank); false/omitted means
+	// the server bakes the time into the image.
+	m["draw_clock"] = r.FormValue("wc_draw_clock") != ""
+
+	if r.FormValue("wc_use_24h") != "" {
+		m["use_24h"] = true
+	} else {
+		m["use_24h"] = false
+	}
+
+	if v, err := strconv.Atoi(r.FormValue("wc_partial_refresh")); err == nil && v > 0 {
+		if v < 60 {
+			v = 60
+		}
+		if v > 3600 {
+			v = 3600
+		}
+		m["partial_refresh"] = v
+	}
+	m["partial_refresh_wifi"] = r.FormValue("wc_partial_refresh_wifi") != ""
+
+	b, _ := json.Marshal(m)
 	return string(b)
 }
 

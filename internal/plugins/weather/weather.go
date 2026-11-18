@@ -63,7 +63,7 @@ type settings struct {
 	Timezone        string  `json:"timezone"`         // IANA name for the clock column; empty == server local
 	Use24h          *bool   `json:"use_24h"`          // clock column format; unset == true (device clock is 24h)
 	Theme           string  `json:"theme"`            // "inkplate" = 1-bit B/W grid for e-paper; empty = classic
-	DrawClock       *bool   `json:"draw_clock"`       // when false (or missing), the server skips clock text; device draws it locally
+	DrawClock       *bool   `json:"draw_clock"`       // true (device-owned) => the server leaves the time card BLANK and the device draws the clock locally; false => the server bakes the time into the image. Single source of truth shared with the deviceapi clock block.
 }
 
 // clock24h reports the default clock-column format: 24-hour, to match the
@@ -194,9 +194,15 @@ func (p *Plugin) DataModel(ctx context.Context, in plugins.RenderInput) (any, er
 	}
 
 	_, cond, _ := codeInfo(fc.Current.WeatherCode)
-	drawClock := true
+	// deviceClock mirrors the single draw_clock flag the admin UI exposes:
+	// when the device owns the clock (draw_clock:true) the server must leave
+	// the time card BLANK (SkipClock) so the device's local minute-tick redraw
+	// is the only source of truth — no stale baked-in time under it. Unset or
+	// false keeps today's behaviour: the server bakes the time into the image
+	// and the deviceapi emits no clock block.
+	deviceClock := false
 	if s.DrawClock != nil {
-		drawClock = *s.DrawClock
+		deviceClock = *s.DrawClock
 	}
 	d := Data{
 		Place:     place,
@@ -212,7 +218,7 @@ func (p *Plugin) DataModel(ctx context.Context, in plugins.RenderInput) (any, er
 		Sunrise:   hhmm(at(fc.Daily.Sunrise, 0)),
 		Sunset:    hhmm(at(fc.Daily.Sunset, 0)),
 		Inkplate:  s.Theme == "inkplate",
-		SkipClock: !drawClock,
+		SkipClock: deviceClock,
 	}
 	for i := range fc.Daily.Time {
 		if i >= 2 {

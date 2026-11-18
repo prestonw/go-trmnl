@@ -90,6 +90,41 @@ func TestDataModelWithCoordinates(t *testing.T) {
 	}
 }
 
+// TestDrawClockControlsSkipClock pins the single-flag contract shared with the
+// deviceapi clock block: draw_clock:true => the server must leave the time
+// card blank (SkipClock) so the device's local minute-tick is the only clock;
+// draw_clock:false or absent => the server bakes the time into the image
+// (SkipClock false) and the deviceapi emits no clock block.
+func TestDrawClockControlsSkipClock(t *testing.T) {
+	cases := []struct {
+		name     string
+		settings string
+		wantSkip bool
+	}{
+		{"unset bakes time", `{"latitude":52.52,"longitude":13.41}`, false},
+		{"explicit false bakes time", `{"latitude":52.52,"longitude":13.41,"draw_clock":false}`, false},
+		{"true blanks the card", `{"latitude":52.52,"longitude":13.41,"draw_clock":true}`, true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			p := newMockPlugin(t)
+			raw, err := p.DataModel(context.Background(), plugins.RenderInput{Settings: []byte(c.settings), Width: 800, Height: 480})
+			if err != nil {
+				t.Fatalf("DataModel: %v", err)
+			}
+			d := raw.(Data)
+			if d.SkipClock != c.wantSkip {
+				t.Errorf("SkipClock = %v, want %v (settings %s)", d.SkipClock, c.wantSkip, c.settings)
+			}
+			// Date and place stay in the image either way — only the big
+			// time digits are the device's to own.
+			if d.Date == "" || d.Place == "" {
+				t.Errorf("date/place must always be baked: date=%q place=%q", d.Date, d.Place)
+			}
+		})
+	}
+}
+
 func TestForecastHeadingDate(t *testing.T) {
 	p := newMockPlugin(t)
 	in := plugins.RenderInput{Settings: []byte(`{"latitude":52.52,"longitude":13.41,"forecast_heading":"date"}`)}

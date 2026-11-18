@@ -71,14 +71,23 @@ type displayResponse struct {
 
 // Clock config: when present, the device draws the clock locally using its RTC
 // and partial updates instead of relying on the server-rendered image.
+//
+// Partial-refresh cadence: the device re-arms a deep-sleep timer to the next
+// whole minute at this interval (default 60s) and redraws ONLY the time
+// digits via a partial e-paper pulse. The radio stays OFF for these wakes —
+// they are the cheapest possible minute tick. `wifi` (default false) is the
+// future hook for waking with the radio up to refresh live data (ticker,
+// YouTube view count, MQTT, …) on the same partial path.
 type Clock struct {
-	Enabled bool   `json:"enabled"`
-	X       int    `json:"x"`          // top-left X (px)
-	Y       int    `json:"y"`          // top-left Y (px)
-	Width   int    `json:"w"`          // zone width (px)
-	Height  int    `json:"h"`          // zone height (px)
-	Font    int    `json:"font_size"`  // base font size
-	Format  string `json:"format"`     // "24h" or "12h"
+	Enabled         bool   `json:"enabled"`
+	X               int    `json:"x"`             // top-left X (px)
+	Y               int    `json:"y"`             // top-left Y (px)
+	Width           int    `json:"w"`             // zone width (px)
+	Height          int    `json:"h"`             // zone height (px)
+	Font            int    `json:"font_size"`     // base font size
+	Format          string `json:"format"`        // "24h" or "12h"
+	PartialRefresh  int    `json:"partial_refresh"`  // seconds between local minute ticks (default 60)
+	PartialRefreshWiFi bool `json:"partial_refresh_wifi"` // wake with radio up (default false)
 }
 
 // Display persists telemetry from request headers and returns the screen to
@@ -111,61 +120,13 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build clock config from the screen's settings if present.
-	// The device will redraw the clock locally via light-sleep RTC ticks.
+	// When draw_clock is false, the server leaves the time card blank (see
+	// weather.SkipClock) and the device redraws the time locally via RTC
+	// minute ticks — a single draw_clock flag keeps the two in sync so they
+	// can never double-draw or both skip.
 	var clockCfg *Clock
 	if img.screen != nil && img.screen.SettingsJSON != "" {
-		var screenSettings struct {
-			DrawClock  *bool `json:"draw_clock"`
-			ClockX     *int  `json:"clock_x"`
-			ClockY     *int  `json:"clock_y"`
-			ClockW     *int  `json:"clock_w"`
-			ClockH     *int  `json:"clock_h"`
-			ClockFont  *int  `json:"clock_font_size"`
-			Clock24h   *bool `json:"clock_24h"`
-			Timezone   string `json:"timezone"`
-		}
-		if err := json.Unmarshal([]byte(img.screen.SettingsJSON), &screenSettings); err == nil {
-			showClock := false
-			if screenSettings.DrawClock != nil && *screenSettings.DrawClock {
-				showClock = true
-			}
-			if showClock {
-				font := 110
-				if screenSettings.ClockFont != nil && *screenSettings.ClockFont > 0 {
-					font = *screenSettings.ClockFont
-				}
-				fm := "24h"
-				if screenSettings.Clock24h != nil && !*screenSettings.Clock24h {
-					fm = "12h"
-				}
-				// Default zone: top-left time card area on 800x600 landscape
-				x := 20
-				y := 20
-				w := 384
-				h := 252
-				if screenSettings.ClockX != nil && *screenSettings.ClockX > 0 {
-					x = *screenSettings.ClockX
-				}
-				if screenSettings.ClockY != nil && *screenSettings.ClockY > 0 {
-					y = *screenSettings.ClockY
-				}
-				if screenSettings.ClockW != nil && *screenSettings.ClockW > 0 {
-					w = *screenSettings.ClockW
-				}
-				if screenSettings.ClockH != nil && *screenSettings.ClockH > 0 {
-					h = *screenSettings.ClockH
-				}
-				clockCfg = &Clock{
-					Enabled: true,
-					X:       x,
-					Y:       y,
-					Width:   w,
-					Height:  h,
-					Font:    font,
-					Format:  fm,
-				}
-			}
-		}
+		clockCfg = clockFromSettings(img.screen.SettingsJSON)
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, displayResponse{
@@ -189,6 +150,88 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 	}
 	if d.ResetFirmware {
 		_ = h.store.ClearResetFirmware(d.ID)
+	}
+}
+
+// clockFromSettings parses the screen's settings JSON and returns the clock
+// block for the display response, or nil when the device should not draw the
+// clock locally. The single draw_clock flag is the contract shared with the
+// weather plugin's SkipClock: true means the device owns the time card (the
+// server leaves it blank), false/absent means the server bakes the time in.
+//
+// Defaults when the flag is set but individual fields are omitted:
+//   - zone: top-left time card on the 800x600 landscape panel (20,20 384x252)
+//   - font: 110 (matches the server's baked time face)
+//   - format: 24h (device clock is 24-hour by default)
+//   - partial_refresh: 60s, clamped to whole minutes in [60, 3600]
+//   - partial_refresh_wifi: false (radio stays off during the minute tick)
+func clockFromSettings(settingsJSON string) *Clock {
+	if settingsJSON == "" {
+		return nil
+	}
+	var s struct {
+		DrawClock          *bool  `json:"draw_clock"`
+		ClockX             *int   `json:"clock_x"`
+		ClockY             *int   `json:"clock_y"`
+		ClockW             *int   `json:"clock_w"`
+		ClockH             *int   `json:"clock_h"`
+		ClockFont          *int   `json:"clock_font_size"`
+		Clock24h           *bool  `json:"clock_24h"`
+		PartialRefresh     *int   `json:"partial_refresh"`
+		PartialRefreshWiFi *bool  `json:"partial_refresh_wifi"`
+		Timezone           string `json:"timezone"`
+	}
+	if err := json.Unmarshal([]byte(settingsJSON), &s); err != nil {
+		return nil
+	}
+	if s.DrawClock == nil || !*s.DrawClock {
+		return nil
+	}
+	x, y, w, h := 20, 20, 384, 252
+	if s.ClockX != nil && *s.ClockX > 0 {
+		x = *s.ClockX
+	}
+	if s.ClockY != nil && *s.ClockY > 0 {
+		y = *s.ClockY
+	}
+	if s.ClockW != nil && *s.ClockW > 0 {
+		w = *s.ClockW
+	}
+	if s.ClockH != nil && *s.ClockH > 0 {
+		h = *s.ClockH
+	}
+	font := 110
+	if s.ClockFont != nil && *s.ClockFont > 0 {
+		font = *s.ClockFont
+	}
+	fm := "24h"
+	if s.Clock24h != nil && !*s.Clock24h {
+		fm = "12h"
+	}
+	partial := 60
+	if s.PartialRefresh != nil && *s.PartialRefresh > 0 {
+		partial = *s.PartialRefresh
+		if partial < 60 {
+			partial = 60
+		}
+		if partial > 3600 {
+			partial = 3600
+		}
+	}
+	partialWiFi := false
+	if s.PartialRefreshWiFi != nil {
+		partialWiFi = *s.PartialRefreshWiFi
+	}
+	return &Clock{
+		Enabled:            true,
+		X:                  x,
+		Y:                  y,
+		Width:              w,
+		Height:             h,
+		Font:               font,
+		Format:             fm,
+		PartialRefresh:     partial,
+		PartialRefreshWiFi: partialWiFi,
 	}
 }
 
