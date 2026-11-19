@@ -187,7 +187,10 @@ func clockFromSettings(settingsJSON string) *Clock {
 	if s.DrawClock == nil || !*s.DrawClock {
 		return nil
 	}
-	x, y, w, h := 20, 20, 384, 252
+	// Time-band only (NEVER the whole card): the device white-outs this rect and
+	// redraws just the digits each minute; the date/place rows stay baked below.
+	// Measured 800x600 layout: time ink ~y66..155, date ink starts ~y169.
+	x, y, w, h := 24, 58, 376, 104
 	if s.ClockX != nil && *s.ClockX > 0 {
 		x = *s.ClockX
 	}

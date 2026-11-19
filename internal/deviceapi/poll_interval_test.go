@@ -22,13 +22,15 @@ func TestClockFromSettings(t *testing.T) {
 		t.Error("empty settings must not emit a clock block")
 	}
 
-	// Flag true, all defaults: top-left time card zone, 24h, 60s, radio off.
+	// Flag true, all defaults: time-band only (NOT the whole card) so the
+	// device can white-out + redraw just the digits without erasing the baked
+	// date/place rows. 24h, 60s, radio off.
 	c := clockFromSettings(`{"draw_clock":true}`)
 	if c == nil {
 		t.Fatal("draw_clock:true must emit a clock block")
 	}
-	if c.X != 20 || c.Y != 20 || c.Width != 384 || c.Height != 252 {
-		t.Errorf("default zone = %d,%d %dx%d, want 20,20 384x252", c.X, c.Y, c.Width, c.Height)
+	if c.X != 24 || c.Y != 58 || c.Width != 376 || c.Height != 104 {
+		t.Errorf("default zone = %d,%d %dx%d, want 24,58 376x104 (time band)", c.X, c.Y, c.Width, c.Height)
 	}
 	if c.Font != 110 {
 		t.Errorf("default font = %d, want 110", c.Font)
