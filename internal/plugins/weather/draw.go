@@ -416,7 +416,7 @@ func drawInkplate(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 
 		setFace(dc, fs, 26, plugins.StyleSans)
 		dc.DrawStringAnchored(conditionFor(dcat), lx+300, ry, 0, 0.5)
-		dc.DrawStringAnchored(fmt.Sprintf("%.0f° / %.0f°", day.Lo, day.Hi), lx+480, ry, 0, 0.5)
+		dc.DrawStringAnchored(fmt.Sprintf("%.0f° / %.0f°", day.Lo, day.Hi), lx+480, ry-10, 0, 0.5) // user nudge: temp up 10px
 		dc.DrawStringAnchored(fmt.Sprintf("UV %d", day.UV), lx+640, ry, 0, 0.5)
 		// right edge stays clear on the last row for the battery indicator
 	}
