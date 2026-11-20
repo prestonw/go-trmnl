@@ -296,26 +296,47 @@ func drawInkplate(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	topH := fh*0.42
 	inkplateBox(dc, lx, topY, lw, topH, 4)
 	cx := lx + lw/2
-	// Clock text is drawn locally by the device via RTC. Only date/place
-	// are baked into the server image when SkipClock is true.
-	if !d.SkipClock && d.Time != "" {
-		if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, d.Time, 110, lw-40); ok {
-			dc.SetFontFace(f)
+	// Clock text is drawn locally by the device via RTC. When SkipClock is
+	// true the server bakes only the date (top-left corner) and place
+	// (top-right corner) and leaves the middle band (y58..162) blank for the
+	// device's minute-tick. The corner rows sit entirely above the band, so
+	// the per-minute white-out/redraw can never touch the baked text.
+	if d.SkipClock {
+		if d.Date != "" {
+			setFace(dc, fs, 34, plugins.StyleSans)
+			dc.SetRGB(0, 0, 0)
+			// Corner row sits in the card's top strip (y~28..52), well above
+			// the device clock band (y58..162): the minute-tick white-out can
+			// never reach the baked text. Measured, not guessed.
+			dc.DrawStringAnchored(d.Date, lx+24, topY+13, 0, 0.5)
 		}
-		dc.SetRGB(0, 0, 0)
-		dc.DrawStringAnchored(d.Time, cx, topY+topH*0.36, 0.5, 0.5)
-	}
-	if d.Date != "" {
-		setFace(dc, fs, 34, plugins.StyleSans)
-		dc.SetRGB(0, 0, 0)
-		dc.DrawStringAnchored(d.Date, cx, topY+topH*0.64, 0.5, 0.5)
-	}
-	if d.Place != "" {
-		if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, d.Place, 28, lw-40); ok {
-			dc.SetFontFace(f)
+		if d.Place != "" {
+			if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, d.Place, 28, lw-48); ok {
+				dc.SetFontFace(f)
+			}
+			dc.SetRGB(0, 0, 0)
+			dc.DrawStringAnchored(d.Place, lx+lw-24, topY+13, 1, 0.5)
 		}
-		dc.SetRGB(0, 0, 0)
-		dc.DrawStringAnchored(d.Place, cx, topY+topH*0.85, 0.5, 0.5)
+	} else {
+		if d.Time != "" {
+			if f, ok := plugins.FitFace(dc, fs, plugins.StyleTitle, d.Time, 110, lw-40); ok {
+				dc.SetFontFace(f)
+			}
+			dc.SetRGB(0, 0, 0)
+			dc.DrawStringAnchored(d.Time, cx, topY+topH*0.36, 0.5, 0.5)
+		}
+		if d.Date != "" {
+			setFace(dc, fs, 34, plugins.StyleSans)
+			dc.SetRGB(0, 0, 0)
+			dc.DrawStringAnchored(d.Date, cx, topY+topH*0.64, 0.5, 0.5)
+		}
+		if d.Place != "" {
+			if f, ok := plugins.FitFace(dc, fs, plugins.StyleSans, d.Place, 28, lw-40); ok {
+				dc.SetFontFace(f)
+			}
+			dc.SetRGB(0, 0, 0)
+			dc.DrawStringAnchored(d.Place, cx, topY+topH*0.85, 0.5, 0.5)
+		}
 	}
 
 	// ===== Temp card (top right) =====
