@@ -56,17 +56,18 @@ func (h *Handler) Setup(w http.ResponseWriter, r *http.Request) {
 // displayResponse is returned from GET /api/display. Field names match what the
 // firmware parses; firmware_url is null when no update is pending.
 type displayResponse struct {
-	Status             int     `json:"status"`
-	ImageURL           string  `json:"image_url"`
-	Filename           string  `json:"filename"`
-	RefreshRate        int     `json:"refresh_rate"`
-	UpdateFirmware     bool    `json:"update_firmware"`
-	FirmwareURL        *string `json:"firmware_url"`
-	ResetFirmware      bool    `json:"reset_firmware"`
-	SpecialFunction    string  `json:"special_function"`
-	ImageURLTimeout    int     `json:"image_url_timeout"`
-	TemperatureProfile string  `json:"temperature_profile"`
-	Clock              *Clock  `json:"clock,omitempty"`
+	Status             int             `json:"status"`
+	ImageURL           string          `json:"image_url"`
+	Filename           string          `json:"filename"`
+	RefreshRate        int             `json:"refresh_rate"`
+	UpdateFirmware     bool            `json:"update_firmware"`
+	FirmwareURL        *string         `json:"firmware_url"`
+	ResetFirmware      bool            `json:"reset_firmware"`
+	SpecialFunction    string          `json:"special_function"`
+	ImageURLTimeout    int             `json:"image_url_timeout"`
+	TemperatureProfile string          `json:"temperature_profile"`
+	Clock              *Clock          `json:"clock,omitempty"`
+	InkplateConfig     *json.RawMessage `json:"inkplate_config,omitempty"`
 }
 
 // Clock config: when present, the device draws the clock locally using its RTC
@@ -119,6 +120,12 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 		firmwareURL = &d.FirmwareURL.String
 	}
 
+	var inkplateConfig *json.RawMessage
+	if d.InkplateConfig != "" {
+		raw := json.RawMessage(d.InkplateConfig)
+		inkplateConfig = &raw
+	}
+
 	// Build clock config from the screen's settings if present.
 	// When draw_clock is false, the server leaves the time card blank (see
 	// weather.SkipClock) and the device redraws the time locally via RTC
@@ -141,6 +148,7 @@ func (h *Handler) Display(w http.ResponseWriter, r *http.Request) {
 		ImageURLTimeout:    0,
 		TemperatureProfile: "default",
 		Clock:              clockCfg,
+		InkplateConfig:     inkplateConfig,
 	})
 
 	// Firmware update and reset are one-shot: clear them after serving so the

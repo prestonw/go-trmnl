@@ -3,6 +3,8 @@ package admin
 import (
 	"database/sql"
 	"embed"
+	"encoding/json"
+	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
@@ -50,7 +52,42 @@ func mustParseTemplates() *templateSet {
 			}
 			return v
 		},
+		"s": func(vals ...string) []string { return vals },
 		"slice": func(vals ...string) []string { return vals },
+		"parseJSON": func(s string) map[string]any {
+			if s == "" {
+				return map[string]any{}
+			}
+			var m map[string]any
+			if err := json.Unmarshal([]byte(s), &m); err != nil {
+				return map[string]any{}
+			}
+			return m
+		},
+		"hasInkplateField": func(key, val string, cfg string) bool {
+			if cfg == "" {
+				return val == ""
+			}
+			var m map[string]any
+			if err := json.Unmarshal([]byte(cfg), &m); err != nil {
+				return val == ""
+			}
+			return fmt.Sprintf("%v", m[key]) == val
+		},
+		"inkplateField": func(key, def string, cfg string) string {
+			if cfg == "" {
+				return def
+			}
+			var m map[string]any
+			if err := json.Unmarshal([]byte(cfg), &m); err != nil {
+				return def
+			}
+			v, ok := m[key]
+			if !ok {
+				return def
+			}
+			return fmt.Sprintf("%v", v)
+		},
 	}
 	ts := &templateSet{tmpls: map[string]*template.Template{}}
 	for _, p := range pages {

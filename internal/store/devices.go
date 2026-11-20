@@ -9,7 +9,7 @@ const deviceColumns = `id, mac, api_key, friendly_id, name, model, fw_version,
 	width, height, refresh_rate, playlist_id, playlist_cursor,
 	battery_voltage, battery_charging, rssi, wifi_status, last_seen_at, created_at,
 	firmware_update, firmware_url, reset_firmware, special_function, font_bundle,
-	show_battery, color_enabled`
+	show_battery, color_enabled, inkplate_config`
 
 func scanDevice(row interface{ Scan(...any) error }) (*Device, error) {
 	var d Device
@@ -17,7 +17,7 @@ func scanDevice(row interface{ Scan(...any) error }) (*Device, error) {
 		&d.Width, &d.Height, &d.RefreshRate, &d.PlaylistID, &d.PlaylistCursor,
 		&d.BatteryVoltage, &d.BatteryCharging, &d.RSSI, &d.WifiStatus, &d.LastSeenAt, &d.CreatedAt,
 		&d.FirmwareUpdate, &d.FirmwareURL, &d.ResetFirmware, &d.SpecialFunction, &d.FontBundle,
-		&d.ShowBattery, &d.ColorEnabled)
+		&d.ShowBattery, &d.ColorEnabled, &d.InkplateConfig)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrNotFound
 	}
@@ -157,6 +157,22 @@ func (s *Store) SetSpecialFunction(id int64, fn string) error {
 	}
 	_, err := s.db.Exec(`UPDATE devices SET special_function = ? WHERE id = ?`, fn, id)
 	return err
+}
+
+// UpdateInkplateConfig saves the inkplate config JSON for a device.
+func (s *Store) UpdateInkplateConfig(id int64, configJSON string) error {
+	_, err := s.db.Exec(`UPDATE devices SET inkplate_config = ? WHERE id = ?`, configJSON, id)
+	return err
+}
+
+// GetInkplateConfig returns the inkplate config JSON string for a device.
+func (s *Store) GetInkplateConfig(id int64) (string, error) {
+	var cfg string
+	err := s.db.QueryRow(`SELECT inkplate_config FROM devices WHERE id = ?`, id).Scan(&cfg)
+	if err != nil {
+		return "", err
+	}
+	return cfg, nil
 }
 
 // DeleteDevice removes a device and its logs (via cascade).

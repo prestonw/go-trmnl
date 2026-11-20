@@ -77,12 +77,16 @@ func (h *Handler) DeviceDetail(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Get inkplate config for this device
+	inkplateConfig, _ := h.store.GetInkplateConfig(d.ID)
+
 	h.render(w, "device", map[string]any{
 		"Nav":         "devices",
 		"Device":      d,
 		"Playlists":   playlists,
 		"PreviewHash": previewHash,
 		"BaseURL":     h.baseURL,
+		"InkplateConfig": inkplateConfig,
 	})
 }
 
@@ -322,4 +326,43 @@ func (h *Handler) FirmwareUpload(w http.ResponseWriter, r *http.Request) {
 
 	// Redirect back to device detail
 	http.Redirect(w, r, "/admin/devices/"+i64(id), http.StatusFound)
+}
+
+// DeviceInkplateConfigGet returns the inkplate config JSON for a device.
+func (h *Handler) DeviceInkplateConfigGet(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r, "id")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	cfg, err := h.store.GetInkplateConfig(id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	if cfg == "" {
+		w.Write([]byte("{}"))
+	} else {
+		w.Write([]byte(cfg))
+	}
+}
+
+// DeviceInkplateConfigUpdate saves the inkplate config JSON for a device.
+func (h *Handler) DeviceInkplateConfigUpdate(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r, "id")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	cfg := r.FormValue("config")
+	if cfg == "" {
+		http.Error(w, "config is required", http.StatusBadRequest)
+		return
+	}
+	if err := h.store.UpdateInkplateConfig(id, cfg); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/admin/devices/"+chiID(r), http.StatusFound)
 }

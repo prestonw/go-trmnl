@@ -93,6 +93,8 @@ func (h *Handler) Routes(r chi.Router) {
 		r.Post("/devices/{id}/firmware", h.DeviceFirmware)
 		r.Post("/devices/{id}/firmware/upload", h.FirmwareUpload)
 		r.Post("/devices/{id}/firmware/cancel", h.DeviceFirmwareCancel)
+		r.Post("/devices/{id}/inkplate-config", h.DeviceInkplateConfigUpdate)
+		r.Get("/devices/{id}/inkplate-config", h.DeviceInkplateConfigGet)
 		r.Post("/devices/{id}/delete", h.DeviceDelete)
 		r.Get("/devices/{id}/logs", h.DeviceLogs)
 

@@ -34,6 +34,10 @@ type Device struct {
 	// LCD panels instead of 1-bit monochrome BMPs.  The device firmware must
 	// accept color BMPs for this to have an effect.
 	ColorEnabled bool
+	// InkplateConfig is a JSON blob of inkplate-specific settings (partial
+	// refresh zone, wake button GPIO, clock layout, etc.) pushed to the
+	// device on every /api/display poll so changes take effect immediately.
+	InkplateConfig string
 }
 
 // DeviceLog is a single log entry reported by a device.
