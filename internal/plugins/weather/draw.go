@@ -255,16 +255,19 @@ func drawPortrait(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {
 	}
 }
 
-// inkplateFill is the light-grey card fill for the e-paper layout. The 1-bit
-// render pipeline dithers it (Floyd-Steinberg) into a faint dot pattern that
-// reads as light grey on the panel.
-var inkplateFill = color.RGBA{216, 216, 216, 255}
+// inkplateFill is the card fill for the e-paper layout. Pure white: the whole
+// screen is a white field with black ink and black card outlines — no grey,
+// no dither pattern. This also makes the device's local minute-tick invisible:
+// the firmware white-outs the time band (WHITE) before redrawing the digits,
+// and a white wipe on a white card leaves no visible "clean square" (the old
+// grey fill made that wipe a light box on the card).
+var inkplateFill = color.RGBA{255, 255, 255, 255}
 
 // inkplateBlack is the single ink color used for all icons, text, and
 // outlines in the e-paper layout.
 var inkplateBlack = color.RGBA{0, 0, 0, 255}
 
-// inkplateBox draws a light-grey card with a black outline.
+// inkplateBox draws a white card with a black outline (see inkplateFill).
 func inkplateBox(dc *gg.Context, x, y, w, h, lw float64) {
 	dc.SetColor(inkplateFill)
 	dc.DrawRectangle(x, y, w, h)
@@ -275,8 +278,8 @@ func inkplateBox(dc *gg.Context, x, y, w, h, lw float64) {
 }
 
 // drawInkplate renders the 1-bit e-paper dashboard (800x600 landscape):
-// white field, light-grey cards with black outlines, all-black text and
-// icons. Same content as the Waveshare dashboard, rescaled for the panel.
+// white field, white cards with black outlines, all-black text and icons.
+// Pure black-on-white — no grey fills, no dither pattern. Same content as the Waveshare dashboard, rescaled for the panel.
 // The bottom-right corner is left free for the server-drawn battery
 // indicator.
 func drawInkplate(dc *gg.Context, fs *plugins.FontSet, d Data, w, h int) {

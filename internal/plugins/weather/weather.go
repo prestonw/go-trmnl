@@ -412,8 +412,8 @@ func (p *Plugin) Render(_ context.Context, in plugins.RenderInput, raw any) (*im
 	// Direct pixel fill — go-gg Fill() doesn't reliably fill large canvases.
 	var tintR, tintG, tintB uint8
 	if d.Inkplate {
-		// E-paper: white field; grey card fills are dithered by the 1-bit
-		// pipeline (Floyd-Steinberg) into a faint dot pattern.
+		// E-paper: pure white field; cards are white with black outlines,
+		// so the 1-bit pipeline sees only black ink on white (no dithering).
 		tintR, tintG, tintB = uint8(255), uint8(255), uint8(255)
 	} else {
 		tintR, tintG, tintB = uint8(64), uint8(190), uint8(96) // vibrant green default
