@@ -93,7 +93,7 @@
 <p class="muted">Device-specific rendering controls pushed on every /api/display poll. The device reads these and adjusts behavior immediately on next poll.</p>
 <form method="post" action="/admin/devices/{{$d.ID}}/inkplate-config">
   <label>Partial refresh zone
-    <input type="text" name="partial_refresh_zone" id="partial_refresh_zone" placeholder="x,y,w,h" value="{{with .InkplateConfig}}{{range $k,$v := parseJSON .}}{{if eq $k "partial_refresh_zone"}}{{escape $v}}{{end}}{{end}}{{end}}">
+    <input type="text" name="partial_refresh_zone" id="partial_refresh_zone" placeholder="x,y,w,h" value="{{inkplateField "partial_refresh_zone" "" .InkplateConfig}}">
     <p class="muted">Zone to redraw with partial refresh, e.g. "24,58,376,104"</p>
   </label>
   <label>Wake button GPIO
