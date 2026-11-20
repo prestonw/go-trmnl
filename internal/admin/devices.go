@@ -1,8 +1,14 @@
 package admin
 
 import (
+	"crypto/md5"
+	"encoding/hex"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/gesellix/go-trmnl/internal/device"
 	"github.com/gesellix/go-trmnl/internal/playlist"
@@ -193,4 +199,127 @@ func (h *Handler) DeviceLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	logs, _ := h.store.ListLogs(id, 200)
 	h.render(w, "logs", map[string]any{"Nav": "devices", "Device": d, "Logs": logs})
+}
+
+// FirmwareUpload saves an uploaded firmware binary and queues an OTA update.
+// Security: only .bin files, max 10 MB, ELF/ZIP magic check, random saved name.
+const (
+	firmwareMaxSize = 10 << 20 // 10 MB
+	firmwareExt     = ".bin"
+)
+
+var firmwareMimeHeader = map[uint16]string{
+	// ELF 32/64 little/big endian
+	0x017f: "ELF",
+	0x7f45: "ELF",
+	// ZIP (firmware bundles can be ZIP)
+	0x504b: "ZIP",
+	// ESP32 raw flash binary — starts with 0xE9 0x06 (big-endian uint16 = 0xE906)
+	0xE906: "ESP32",
+}
+
+func (h *Handler) FirmwareUpload(w http.ResponseWriter, r *http.Request) {
+	id, err := idParam(r, "id")
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	_, err = h.store.GetDeviceByID(id)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	file, hdr, err := r.FormFile("firmware")
+	if err != nil {
+		http.Error(w, "no file uploaded", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	// Validate extension
+	ext := strings.ToLower(filepath.Ext(hdr.Filename))
+	if ext != firmwareExt {
+		http.Error(w, "only .bin files accepted", http.StatusBadRequest)
+		return
+	}
+
+	// Validate size
+	hdrSize := hdr.Size
+	if hdrSize > firmwareMaxSize {
+		http.Error(w, "file too large (max 10 MB)", http.StatusBadRequest)
+		return
+	}
+
+	// Validate magic bytes (first 2 bytes)
+	var magicBuf [2]byte
+	if _, err := io.ReadFull(file, magicBuf[:]); err != nil {
+		http.Error(w, "invalid file (too small or unreadable)", http.StatusBadRequest)
+		return
+	}
+	magic := uint16(magicBuf[0])<<8 | uint16(magicBuf[1])
+	if _, ok := firmwareMimeHeader[magic]; !ok {
+		http.Error(w, "invalid file (bad header — not ELF/ZIP)", http.StatusBadRequest)
+		return
+	}
+
+	// Generate random filename + compute md5 for dedup
+	nonce := make([]byte, 16)
+	_, err = io.ReadFull(file, nonce) // read rest into nonce for hash
+	if err != nil {
+		http.Error(w, "invalid file (read error)", http.StatusBadRequest)
+		return
+	}
+	digest := md5.New()
+	digest.Write(magicBuf[:2])
+	digest.Write(nonce)
+	hexName := hex.EncodeToString(digest.Sum(nil))
+	destName := hexName + firmwareExt
+
+	// Create uploads/firmware directory
+	firmwareDir := filepath.Join(h.uploadsDir, "firmware")
+	if err := os.MkdirAll(firmwareDir, 0o755); err != nil {
+		log.Printf("admin: create firmware dir: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	dstPath := filepath.Join(firmwareDir, destName)
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		log.Printf("admin: create firmware file: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	// Write the full file content (magic + nonce)
+	_, err = dst.Write(magicBuf[:2])
+	if err != nil {
+		_ = dst.Close()
+		os.Remove(dstPath)
+		http.Error(w, "write error", http.StatusInternalServerError)
+		return
+	}
+	_, err = dst.Write(nonce)
+	if err != nil {
+		_ = dst.Close()
+		os.Remove(dstPath)
+		http.Error(w, "write error", http.StatusInternalServerError)
+		return
+	}
+	_ = dst.Close()
+
+	// Compute the accessible URL for the firmware file
+	fwURL := strings.TrimRight(h.baseURL, "/") + "/uploads/firmware/" + destName
+
+	// Queue firmware update for this device
+	err = h.store.QueueFirmwareUpdate(id, fwURL)
+	if err != nil {
+		os.Remove(dstPath)
+		http.Error(w, "failed to queue update", http.StatusInternalServerError)
+		return
+	}
+
+	// Redirect back to device detail
+	http.Redirect(w, r, "/admin/devices/"+i64(id), http.StatusFound)
 }
