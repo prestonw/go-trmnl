@@ -52,6 +52,13 @@ func mustParseTemplates() *templateSet {
 			}
 			return v
 		},
+		"cond": func(b bool, a, b2 string) string {
+			if b {
+				return a
+			}
+			return b2
+		},
+		"str": func(s string) string { return s },
 		"s": func(vals ...string) []string { return vals },
 		"slice": func(vals ...string) []string { return vals },
 		"parseJSON": func(s string) map[string]any {

@@ -3,6 +3,7 @@ package admin
 import (
 	"crypto/md5"
 	"encoding/hex"
+	"encoding/json"
 	"io"
 	"log"
 	"net/http"
@@ -355,12 +356,49 @@ func (h *Handler) DeviceInkplateConfigUpdate(w http.ResponseWriter, r *http.Requ
 		http.NotFound(w, r)
 		return
 	}
-	cfg := r.FormValue("config")
-	if cfg == "" {
-		http.Error(w, "config is required", http.StatusBadRequest)
+
+	// Accept individual form fields
+	cfgMap := map[string]string{
+		"partial_refresh_zone": r.FormValue("partial_refresh_zone"),
+		"wake_button_gpio":     r.FormValue("wake_button_gpio"),
+		"bg_fill":              r.FormValue("bg_fill"),
+		"full_refresh_interval": r.FormValue("full_refresh_interval"),
+		"bold_text":            r.FormValue("bold_text"),
+		"time_format":          r.FormValue("time_format"),
+		"location_position":    r.FormValue("location_position"),
+		"show_battery":         r.FormValue("show_battery"),
+	}
+
+	// Build JSON
+	if cfg, ok := r.Form["config"]; ok && cfg[0] != "" {
+		// Client sent JSON config directly
+		if !json.Valid([]byte(cfg[0])) {
+			http.Error(w, "invalid config JSON", http.StatusBadRequest)
+			return
+		}
+		cfgStr := cfg[0]
+		if err := h.store.UpdateInkplateConfig(id, cfgStr); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/admin/devices/"+chiID(r), http.StatusFound)
 		return
 	}
-	if err := h.store.UpdateInkplateConfig(id, cfg); err != nil {
+
+	// Filter out empty values
+	for k, v := range cfgMap {
+		if v == "" {
+			delete(cfgMap, k)
+		}
+	}
+
+	cfgBytes, err := json.Marshal(cfgMap)
+	if err != nil {
+		http.Error(w, "failed to build config", http.StatusInternalServerError)
+		return
+	}
+	cfgStr := string(cfgBytes)
+	if err := h.store.UpdateInkplateConfig(id, cfgStr); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

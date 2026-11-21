@@ -91,15 +91,16 @@
 
 <h2>Inkplate Controls</h2>
 <p class="muted">Device-specific rendering controls pushed on every /api/display poll. The device reads these and adjusts behavior immediately on next poll.</p>
+{{- $root := . }}
 <form method="post" action="/admin/devices/{{$d.ID}}/inkplate-config">
   <label>Partial refresh zone
-    <input type="text" name="partial_refresh_zone" id="partial_refresh_zone" placeholder="x,y,w,h" value="{{inkplateField "partial_refresh_zone" "" .InkplateConfig}}">
+    <input type="text" name="partial_refresh_zone" id="partial_refresh_zone" placeholder="x,y,w,h" value="{{inkplateField "partial_refresh_zone" "" $root.InkplateConfig}}">
     <p class="muted">Zone to redraw with partial refresh, e.g. "24,58,376,104"</p>
   </label>
   <label>Wake button GPIO
     <select name="wake_button_gpio">
       {{range $opt := slice "none" "36" "35" "34" "33"}}
-        <option value="{{$opt}}" {{if hasInkplateField "wake_button_gpio" $opt .InkplateConfig}}selected{{end}}>{{$opt}}</option>
+        <option value="{{$opt}}" {{if hasInkplateField "wake_button_gpio" $opt $root.InkplateConfig}}selected{{end}}>{{$opt}}</option>
       {{end}}
     </select>
     <p class="muted">GPIO pin for wake button. GPIO36 = default Inkplate6 wake pin.</p>
@@ -107,19 +108,19 @@
   <label>Background fill
     <select name="bg_fill">
       {{range $opt := slice "white" "gray" "off"}}
-        <option value="{{$opt}}" {{if hasInkplateField "bg_fill" $opt .InkplateConfig}}selected{{end}}>{{$opt}}</option>
+        <option value="{{$opt}}" {{if hasInkplateField "bg_fill" $opt $root.InkplateConfig}}selected{{end}}>{{$opt}}</option>
       {{end}}
     </select>
     <p class="muted">Full white wipe before redraw to prevent ghosting.</p>
   </label>
   <label>Full refresh interval (seconds)
-    <input type="number" name="full_refresh_interval" min="0" value="{{inkplateField "full_refresh_interval" "0" .InkplateConfig}}">
+    <input type="number" name="full_refresh_interval" min="0" value="{{inkplateField "full_refresh_interval" "0" $root.InkplateConfig}}">
     <p class="muted">0 = disabled. When set, device does full refresh every N seconds.</p>
   </label>
   <label>Bold text
     <select name="bold_text">
       {{range $opt := slice "auto" "on" "off"}}
-        <option value="{{$opt}}" {{if hasInkplateField "bold_text" $opt .InkplateConfig}}selected{{end}}>{{$opt}}</option>
+        <option value="{{$opt}}" {{if hasInkplateField "bold_text" $opt $root.InkplateConfig}}selected{{end}}>{{$opt}}</option>
       {{end}}
     </select>
     <p class="muted">Auto = server-side bold. On = device doubles ink.</p>
@@ -127,7 +128,7 @@
   <label>Time display format
     <select name="time_format">
       {{range $opt := slice "digits" "words" "both"}}
-        <option value="{{$opt}}" {{if hasInkplateField "time_format" $opt .InkplateConfig}}selected{{end}}>{{$opt}}</option>
+        <option value="{{$opt}}" {{if hasInkplateField "time_format" $opt $root.InkplateConfig}}selected{{end}}>{{$opt}}</option>
       {{end}}
     </select>
     <p class="muted">Words = "Ten", "Fifty Nine" stacked. Digits = traditional.</p>
@@ -135,7 +136,7 @@
   <label>Location position
     <select name="location_position">
       {{range $opt := slice "below_time" "above_weather" "hidden"}}
-        <option value="{{$opt}}" {{if hasInkplateField "location_position" $opt .InkplateConfig}}selected{{end}}>{{$opt}}</option>
+        <option value="{{$opt}}" {{if hasInkplateField "location_position" $opt $root.InkplateConfig}}selected{{end}}>{{$opt}}</option>
       {{end}}
     </select>
     <p class="muted">Where to draw the location name.</p>
